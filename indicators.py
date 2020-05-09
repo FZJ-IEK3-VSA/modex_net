@@ -98,6 +98,7 @@ class Calculator:
     def __init__(self, scenario, data_source="csv"):
 
         logging.basicConfig(level=logging.INFO)
+        logger.info("All methods assume hourly profiles.")
 
         self.scenario = scenario
         self.data_source = data_source
@@ -119,3 +120,23 @@ class Calculator:
         return (pd.concat([getattr(self, quantity)[model].std()/getattr(self, quantity)[model].mean()
                            for model in model_names], axis=1)
                 .rename(columns=dict(enumerate(model_names))))
+
+    def percentile(self, quantity, percent=0.75):
+
+        assert quantity in quantities, "\'"+str(quantity)+"\'"+" is not a valid quantity to measure."
+
+        return (pd.concat([getattr(self, quantity)[model].quantile(percent).rename(None)
+                           for model in model_names], axis=1)
+                .rename(columns=dict(enumerate(model_names))))
+
+    def percentile_converter(self, quantity, percent=0.75):
+
+        assert quantity in quantities, "\'"+str(quantity)+"\'"+" is not a valid quantity to measure."
+
+        converter_capacities = self.percentile(quantity, percent)
+
+        return (pd.concat([getattr(self, quantity)[model].clip(0, converter_capacities[model], axis=1).sum()
+                           for model in model_names], axis=1)
+                .rename(columns=dict(enumerate(model_names))))
+
+
