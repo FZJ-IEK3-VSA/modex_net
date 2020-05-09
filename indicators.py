@@ -18,63 +18,104 @@ eu_neighs_ISO2 = ["AT", "BE", "CH", "CZ", "DK", "FR", "LU", "NL", "NO", "PL", "S
 eu_neighs_names = pd.Series(["Austria", "Belgium", "Switzerland", "Czechia", "Denmark", "France", "Luxemburg",
                              "Netherlands", "Norway", "Poland", "Sweden"], index=eu_neighs_ISO2)
 
+model_names = ["europower", "perseus", "mars", "powerflex", "ego", "miles", "isaar", "elmod"]
+model_names_plot = pd.Series(["Europower", "Perseus/Tango", "MarS/ZKNOT", "Powerflex-Grid-EU",
+                              "eGo/eTraGo", "MILES", "ISAaR", "ELMOD"], index=model_names)
+
+quantities_time = [
+                   "vres_curtailments",    # Dataframes, regions/time
+                   "redispatch_vol",       # Dataframes, regions/time
+                   "emissions",            # Dataframes, regions/time
+                   "load_curtailments",    # Dataframes, regions/time
+
+                   "storage_discharging",  # Dataframes, regions/time
+                   "storage_charging",     # Dataframes, regions/time
+
+                   "exports",              # Dataframes, interconnections/time
+                   "imports",              # Dataframes, interconnections/time
+                   "line_loadings",        # Dataframes, lines/time
+
+                   "electricity_prices",   # Dataframes, regions/time
+                   "redispatch_cost"       # Dataframes, regions/time
+                  ]
+quantities_categorical = ["energy_mix"]    # Dataframes, regions/carrier
+quantities = quantities_time + quantities_categorical
 
 class Calculator:
 
-    def __init__(self, scenario):
+    def quantity_get_set(quantity):
+
+        @property
+        def quantity_prop(self):
+
+            for model in model_names:
+
+                if getattr(self, '_'+quantity)[model].empty:
+                    logger.info(str(quantity)+" data for "+str(model)+" is empty. Loading from "+str(self.data_source))
+
+                    if self.data_source == "csv":
+
+                        if quantity in quantities_time:
+                            getattr(self, '_'+quantity).update({model: pd.read_csv("data/" + str(self.scenario) + "/"
+                                                                                   + quantity + "/" + model + ".csv",
+                                                                                   index_col='snapshots',
+                                                                                   parse_dates=True)})
+                        if quantity in quantities_categorical:
+                            getattr(self, quantity).update({model: pd.read_csv("data/" + str(self.scenario) + "/"
+                                                                               + quantity + "/" + model + ".csv",
+                                                                               index_col='index')})
+
+                    elif self.data_source == "oep":
+                        pass
+
+                    else:
+                        raise NotImplementedError
+
+            return getattr(self, '_'+quantity)
+
+        @quantity_prop.setter
+        def quantity_prop(self, value):
+            setattr(self, '_'+quantity, value)
+
+        return quantity_prop
+
+    # quantities
+    vres_curtailments = quantity_get_set("vres_curtailments")
+    redispatch_vol = quantity_get_set("redispatch_vol")
+    emissions = quantity_get_set("emissions")
+    load_curtailments = quantity_get_set("load_curtailments")
+
+    storage_discharging = quantity_get_set("storage_discharging")
+    storage_charging = quantity_get_set("storage_charging")
+
+    exports = quantity_get_set("exports")
+    imports = quantity_get_set("imports")
+    line_loadings = quantity_get_set("line_loadings")
+
+    electricity_prices = quantity_get_set("electricity_prices")
+    redispatch_cost = quantity_get_set("redispatch_cost")
+
+    def __init__(self, scenario, data_source="csv"):
 
         logging.basicConfig(level=logging.INFO)
 
         self.scenario = scenario
+        self.data_source = data_source
 
-        self.model_names = ["europower", "perseus", "mars", "powerflex", "ego", "miles", "isaar", "elmod"]
-        self.model_names_plot = pd.Series(["Europower", "Perseus/Tango", "MarS/ZKNOT", "Powerflex-Grid-EU",
-                                           "eGo/eTraGo", "MILES", "ISAaR", "ELMOD"], index=self.model_names)
+        for quantity in quantities:
+            setattr(self, quantity, dict(zip(model_names, [pd.DataFrame()]*len(model_names))))
 
-        self.quantities_time = [
-                                "vres_curtailments",    # Dataframes, regions/time
-                                "redispatch_vol",       # Dataframes, regions/time
-                                "emissions",            # Dataframes, regions/time
-                                "load_curtailments",    # Dataframes, regions/time
+    def sum(self, quantity):
 
-                                "storage_discharging",  # Dataframes, regions/time
-                                "storage_charging",     # Dataframes, regions/time
+        assert quantity in quantities, "\'"+str(quantity)+"\'"+" is not a valid quantity to measure."
 
-                                "exports",              # Dataframes, interconnections/time
-                                "imports",              # Dataframes, interconnections/time
-                                "line_loadings",        # Dataframes, lines/time
+        return (pd.concat([getattr(self, quantity)[model].sum() for model in model_names], axis=1)
+                .rename(columns=dict(enumerate(model_names))))
 
-                                "electricity_prices",   # Dataframes, regions/time
-                                "redispatch_cost"       # Dataframes, regions/time
-                                ]
-        self.quantities_categorical = ["energy_mix"]    # Dataframes, regions/carrier
-        self.quantities = self.quantities_time+self.quantities_categorical
+    def normalized_std(self, quantity):
 
-        for quantity in self.quantities:
-            setattr(self, quantity, dict(zip(self.model_names, [pd.DataFrame()]*len(self.model_names))))
+        assert quantity in quantities, "\'"+str(quantity)+"\'"+" is not a valid quantity to measure."
 
-    def load_data(self, quantity="all", source="csv"):
-
-        if quantity not in self.quantities+["all"]:
-            logger.warning("Could not load any data. "+str(quantity).title()+" does not exist.")
-
-        if source == "csv":
-            if quantity == "all":
-                for q in self.quantities:
-                    self.load_data(source, q)
-            else:
-                if quantity in self.quantities_time:
-                    for model in self.model_names:
-                        getattr(self, quantity).update({model: pd.read_csv("data/"+quantity+"/"+model+".csv",
-                                                                           index_col='snapshots',
-                                                                           parse_dates=True)})
-                elif quantity in self.quantities_categorical:
-                    for model in self.model_names:
-                        getattr(self, quantity).update({model: pd.read_csv("data/"+quantity+"/"+model+".csv",
-                                                                           index_col='index')})
-
-        elif source == "oep":
-            pass
-
-        else:
-            raise NotImplementedError
+        return (pd.concat([getattr(self, quantity)[model].std()/getattr(self, quantity)[model].mean()
+                           for model in model_names], axis=1)
+                .rename(columns=dict(enumerate(model_names))))
