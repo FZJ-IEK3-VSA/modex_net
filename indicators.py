@@ -41,6 +41,12 @@ quantities_time = [
 quantities_categorical = ["energy_mix"]    # Dataframes, regions/carrier
 quantities = quantities_time + quantities_categorical
 
+
+def wasserstein(a, b):
+    from scipy.stats import wasserstein_distance
+    return wasserstein_distance(a, b)
+
+
 class Calculator:
 
     def quantity_get_set(quantity):
@@ -138,5 +144,17 @@ class Calculator:
         return (pd.concat([getattr(self, quantity)[model].clip(0, converter_capacities[model], axis=1).sum()
                            for model in model_names], axis=1)
                 .rename(columns=dict(enumerate(model_names))))
+
+    def wasserstein(self, quantity):
+
+        assert quantity in quantities, "\'" + str(quantity) + "\'" + " is not a valid quantity to measure."
+
+        return {model: (pd.concat([(getattr(self, quantity)[model]
+                                    .combine(getattr(self, quantity)[mod], wasserstein)
+                                    .iloc[0]
+                                    .rename(None))
+                                   for mod in model_names], axis=1)
+                        .rename(columns=dict(enumerate(model_names))))
+                for model in model_names}
 
 
