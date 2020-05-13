@@ -4,6 +4,9 @@
 """
 
 import pandas as pd
+import numpy as np
+
+import textwrap
 
 import logging
 logger = logging.getLogger(__name__)
@@ -45,6 +48,31 @@ quantities = quantities_time + quantities_categorical
 def wasserstein(a, b):
     from scipy.stats import wasserstein_distance
     return wasserstein_distance(a, b)
+
+
+def bhattacharyya_pdf(a, b):
+    """ Bhattacharyya distance between distributions (lists of floats).
+    see https://gist.github.com/miku/1671b2014b003ee7b9054c0618c805f7
+    """
+    if not len(a) == len(b):
+        raise ValueError("a and b must be of the same size")
+    return -np.log(sum((np.sqrt(u * w) for u, w in zip(a/sum(a), b/sum(b)))))
+
+
+def bhattacharyya(a, b):
+    from scipy import stats
+    x_min = min([a.min(), b.min()])
+    x_max = max([a.max(), b.max()])
+    x = np.linspace(x_min, x_max, 1000)
+
+    pdf_a = stats.gaussian_kde(a)
+    pdf_b = stats.gaussian_kde(b)
+
+    return bhattacharyya_pdf(pdf_a(x), pdf_b(x))
+
+
+metrics = {'wasserstein': wasserstein,
+           'bhattacharyya': bhattacharyya}
 
 
 class Calculator:
@@ -121,7 +149,7 @@ class Calculator:
 
     def normalized_std(self, quantity):
 
-        assert quantity in quantities, "\'"+str(quantity)+"\'"+" is not a valid quantity to measure."
+        assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
 
         return (pd.concat([getattr(self, quantity)[model].std()/getattr(self, quantity)[model].mean()
                            for model in model_names], axis=1)
@@ -129,7 +157,7 @@ class Calculator:
 
     def percentile(self, quantity, percent=0.75):
 
-        assert quantity in quantities, "\'"+str(quantity)+"\'"+" is not a valid quantity to measure."
+        assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
 
         return (pd.concat([getattr(self, quantity)[model].quantile(percent).rename(None)
                            for model in model_names], axis=1)
@@ -137,7 +165,7 @@ class Calculator:
 
     def percentile_converter(self, quantity, percent=0.75):
 
-        assert quantity in quantities, "\'"+str(quantity)+"\'"+" is not a valid quantity to measure."
+        assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
 
         converter_capacities = self.percentile(quantity, percent)
 
@@ -145,16 +173,18 @@ class Calculator:
                            for model in model_names], axis=1)
                 .rename(columns=dict(enumerate(model_names))))
 
-    def wasserstein(self, quantity):
+    def pair_distance(self, quantity, metric):
 
-        assert quantity in quantities, "\'" + str(quantity) + "\'" + " is not a valid quantity to measure."
+        assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
+        assert metric in metrics.keys(), "Valid metrics can only be one of [" + ", ".join(metrics.keys()) + "]"
 
         return {model: (pd.concat([(getattr(self, quantity)[model]
-                                    .combine(getattr(self, quantity)[mod], wasserstein)
+                                    .combine(getattr(self, quantity)[mod], metrics[metric])
                                     .iloc[0]
                                     .rename(None))
                                    for mod in model_names], axis=1)
                         .rename(columns=dict(enumerate(model_names))))
                 for model in model_names}
+
 
 
