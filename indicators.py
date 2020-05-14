@@ -5,8 +5,7 @@
 
 import pandas as pd
 import numpy as np
-
-import textwrap
+from scipy.stats import wasserstein_distance, gaussian_kde
 
 import logging
 logger = logging.getLogger(__name__)
@@ -46,29 +45,28 @@ quantities = quantities_time + quantities_categorical
 
 
 def wasserstein(a, b):
-    from scipy.stats import wasserstein_distance
-    return wasserstein_distance(a, b)
+    x_min = min([a.min(), b.min()])
+    x_max = max([a.max(), b.max()])
+    x = np.linspace(x_min, x_max, 1000)
+
+    pdf_a = gaussian_kde(a)
+    pdf_b = gaussian_kde(b)
+    return wasserstein_distance(pdf_a(x), pdf_b(x))
 
 
-def bhattacharyya_pdf(a, b):
+def bhattacharyya(a, b):
     """ Bhattacharyya distance between distributions (lists of floats).
     see https://gist.github.com/miku/1671b2014b003ee7b9054c0618c805f7
     """
     if not len(a) == len(b):
         raise ValueError("a and b must be of the same size")
-    return -np.log(sum((np.sqrt(u * w) for u, w in zip(a/sum(a), b/sum(b)))))
-
-
-def bhattacharyya(a, b):
-    from scipy import stats
-    x_min = min([a.min(), b.min()])
-    x_max = max([a.max(), b.max()])
+    x_min = min([min(a), min(b)])
+    x_max = max([max(a), max(b)])
     x = np.linspace(x_min, x_max, 1000)
 
-    pdf_a = stats.gaussian_kde(a)
-    pdf_b = stats.gaussian_kde(b)
-
-    return bhattacharyya_pdf(pdf_a(x), pdf_b(x))
+    pdf_a = gaussian_kde(a)
+    pdf_b = gaussian_kde(b)
+    return -np.log(sum((np.sqrt(u * w) for u, w in zip(pdf_a(x)/sum(pdf_a(x)), pdf_b(x)/sum(pdf_b(x))))))
 
 
 metrics = {'wasserstein': wasserstein,
@@ -77,7 +75,7 @@ metrics = {'wasserstein': wasserstein,
 
 class Calculator:
 
-    def quantity_get_set(quantity):
+    def _quantity_get_set(quantity):
 
         @property
         def quantity_prop(self):
@@ -114,20 +112,20 @@ class Calculator:
         return quantity_prop
 
     # quantities
-    vres_curtailments = quantity_get_set("vres_curtailments")
-    redispatch_vol = quantity_get_set("redispatch_vol")
-    emissions = quantity_get_set("emissions")
-    load_curtailments = quantity_get_set("load_curtailments")
+    vres_curtailments = _quantity_get_set("vres_curtailments")
+    redispatch_vol = _quantity_get_set("redispatch_vol")
+    emissions = _quantity_get_set("emissions")
+    load_curtailments = _quantity_get_set("load_curtailments")
 
-    storage_discharging = quantity_get_set("storage_discharging")
-    storage_charging = quantity_get_set("storage_charging")
+    storage_discharging = _quantity_get_set("storage_discharging")
+    storage_charging = _quantity_get_set("storage_charging")
 
-    exports = quantity_get_set("exports")
-    imports = quantity_get_set("imports")
-    line_loadings = quantity_get_set("line_loadings")
+    exports = _quantity_get_set("exports")
+    imports = _quantity_get_set("imports")
+    line_loadings = _quantity_get_set("line_loadings")
 
-    electricity_prices = quantity_get_set("electricity_prices")
-    redispatch_cost = quantity_get_set("redispatch_cost")
+    electricity_prices = _quantity_get_set("electricity_prices")
+    redispatch_cost = _quantity_get_set("redispatch_cost")
 
     def __init__(self, scenario, data_source="csv"):
 
