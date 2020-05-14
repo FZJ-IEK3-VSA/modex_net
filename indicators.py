@@ -69,8 +69,19 @@ def bhattacharyya(a, b):
     return -np.log(sum((np.sqrt(u * w) for u, w in zip(pdf_a(x)/sum(pdf_a(x)), pdf_b(x)/sum(pdf_b(x))))))
 
 
+def frechet(a, b):
+    return (a - b).abs().max()
+
+
+def dtw(a, b):
+    import dtw as dtw_mod
+    return dtw_mod.accelerated_dtw(a.values, b.values, 'minkowski', p=1)[0]
+
+
 metrics = {'wasserstein': wasserstein,
-           'bhattacharyya': bhattacharyya}
+           'bhattacharyya': bhattacharyya,
+           'frechet': frechet,
+           'dtw': dtw}
 
 
 class Calculator:
