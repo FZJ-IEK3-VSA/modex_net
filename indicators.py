@@ -78,10 +78,15 @@ def dtw(a, b):
     return dtw_mod.accelerated_dtw(a.values, b.values, 'minkowski', p=1)[0]
 
 
+def corr(a, b):
+    return a.corr(b)
+
+
 metrics = {'wasserstein': wasserstein,
            'bhattacharyya': bhattacharyya,
            'frechet': frechet,
-           'dtw': dtw}
+           'dtw': dtw,
+           'correlation': corr}
 
 
 class Calculator:
