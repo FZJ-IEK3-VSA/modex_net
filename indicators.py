@@ -3,6 +3,7 @@
 @author: Chloi Syranidou
 """
 
+import os
 import pandas as pd
 import numpy as np
 from scipy.stats import wasserstein_distance, gaussian_kde
@@ -103,14 +104,15 @@ class Calculator:
 
                     if self.data_source == "csv":
 
+                        data_path = os.path.join(os.path.dirname(__file__), "data", str(self.scenario), model,
+                                                 quantity+".csv")
+
                         if quantity in quantities_time:
-                            getattr(self, '_'+quantity).update({model: pd.read_csv("data/" + str(self.scenario) + "/"
-                                                                                   + model + "/" + quantity + ".csv",
+                            getattr(self, '_'+quantity).update({model: pd.read_csv(data_path,
                                                                                    index_col='snapshots',
                                                                                    parse_dates=True)})
                         if quantity in quantities_categorical:
-                            getattr(self, quantity).update({model: pd.read_csv("data/" + str(self.scenario) + "/"
-                                                                               + quantity + "/" + model + ".csv",
+                            getattr(self, quantity).update({model: pd.read_csv(data_path,
                                                                                index_col='index')})
 
                     elif self.data_source == "oep":
