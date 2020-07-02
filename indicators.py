@@ -105,7 +105,7 @@ class Calculator:
 
                         if quantity in quantities_time:
                             getattr(self, '_'+quantity).update({model: pd.read_csv("data/" + str(self.scenario) + "/"
-                                                                                   + quantity + "/" + model + ".csv",
+                                                                                   + model + "/" + quantity + ".csv",
                                                                                    index_col='snapshots',
                                                                                    parse_dates=True)})
                         if quantity in quantities_categorical:
