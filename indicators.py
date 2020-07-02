@@ -75,7 +75,14 @@ def frechet(a, b):
 
 
 def dtw(a, b):
-    import dtw as dtw_mod
+
+    # import module from given path: https://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path
+    import importlib.util
+    dtw_mod_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "dtw", "dtw", "dtw.py"))
+    spec = importlib.util.spec_from_file_location("dtw", dtw_mod_path)
+    dtw_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dtw_mod)
+
     return dtw_mod.accelerated_dtw(a.values, b.values, 'minkowski', p=1)[0]
 
 
