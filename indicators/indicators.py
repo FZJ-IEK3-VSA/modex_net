@@ -120,8 +120,8 @@ class Calculator:
                                                                                    index_col='snapshots',
                                                                                    parse_dates=True)})
                         if quantity in quantities_categorical:
-                            getattr(self, quantity).update({model: pd.read_csv(data_path,
-                                                                               index_col='index')})
+                            getattr(self, '_'+quantity).update({model: pd.read_csv(data_path,
+                                                                               index_col='carrier')})
 
                     elif self.data_source == "oep":
                         pass
@@ -152,6 +152,8 @@ class Calculator:
 
     electricity_prices = _quantity_get_set("electricity_prices")
     redispatch_cost = _quantity_get_set("redispatch_cost")
+
+    energy_mix = _quantity_get_set("energy_mix")
 
     def __init__(self, scenario, data_source="csv"):
 
