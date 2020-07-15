@@ -225,3 +225,16 @@ class Calculator:
                         .rename(columns=dict(enumerate(model_names))))
                 for model in model_names}
 
+    def line_overload_incidents(self, threshold=0.7):
+        """
+         Returns the percentage of all line overloads over all time steps. A line overload is considered when it's load
+         exceeds the corresponding capacity times the given threshold.
+        """
+
+        def overload_incidents(df):
+            df = df > threshold
+            return df.sum().sum() / (df.shape[0] * df.shape[1])
+
+        return pd.Series([overload_incidents(df) for df in self.line_loadings.values()],
+                         index=self.line_loadings.keys())
+
