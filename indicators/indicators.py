@@ -8,6 +8,8 @@ import pandas as pd
 import numpy as np
 from scipy.stats import wasserstein_distance, gaussian_kde
 
+from . import plots
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -26,22 +28,21 @@ model_names_plot = pd.Series(["Europower", "Perseus/Tango", "MarS/ZKNOT", "Power
                               "eGo/eTraGo", "MILES", "ISAaR", "ELMOD"], index=model_names)
 
 quantities_time = [
-                   "vres_curtailments",    # Dataframes, regions/time
-                   "redispatch_vol",       # Dataframes, regions/time
-                   "emissions",            # Dataframes, regions/time
-                   "load_curtailments",    # Dataframes, regions/time
+                   "vres_curtailments",    # Dataframes, time/regions
+                   "redispatch_vol",       # Dataframes, time/regions
+                   "emissions",            # Dataframes, time/regions
+                   "load_curtailments",    # Dataframes, time/regions
 
-                   "storage_discharging",  # Dataframes, regions/time
-                   "storage_charging",     # Dataframes, regions/time
+                   "storage_discharging",  # Dataframes, time/regions
+                   "storage_charging",     # Dataframes, time/regions
 
-                   "exports",              # Dataframes, interconnections/time
-                   "imports",              # Dataframes, interconnections/time
-                   "line_loadings",        # Dataframes, lines/time
+                   "import_export",        # Dataframes, time/interconnections
+                   "line_loadings",        # Dataframes, time/lines
 
-                   "electricity_prices",   # Dataframes, regions/time
-                   "redispatch_cost"       # Dataframes, regions/time
+                   "electricity_prices",   # Dataframes, time/regions
+                   "redispatch_cost"       # Dataframes, time/regions
                   ]
-quantities_categorical = ["energy_mix"]    # Dataframes, regions/carrier
+quantities_categorical = ["energy_mix"]    # Dataframes, carrier/regions
 quantities = quantities_time + quantities_categorical
 
 
@@ -78,7 +79,7 @@ def dtw(a, b):
 
     # import module from given path: https://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path
     import importlib.util
-    dtw_mod_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "dtw", "dtw", "dtw.py"))
+    dtw_mod_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dtw", "dtw", "dtw.py"))
     spec = importlib.util.spec_from_file_location("dtw", dtw_mod_path)
     dtw_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(dtw_mod)
@@ -111,7 +112,7 @@ class Calculator:
 
                     if self.data_source == "csv":
 
-                        data_path = os.path.join(os.path.dirname(__file__), "data", str(self.scenario), model,
+                        data_path = os.path.join(os.path.dirname(__file__), "..", "data", str(self.scenario), model,
                                                  quantity+".csv")
 
                         if quantity in quantities_time:
@@ -165,7 +166,7 @@ class Calculator:
 
     def sum(self, quantity):
 
-        assert quantity in quantities, "\'"+str(quantity)+"\'"+" is not a valid quantity to measure."
+        assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
 
         return (pd.concat([getattr(self, quantity)[model].sum() for model in model_names], axis=1)
                 .rename(columns=dict(enumerate(model_names))))
@@ -181,6 +182,7 @@ class Calculator:
     def percentile(self, quantity, percent=0.75):
 
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
+        assert 0. <= percent <= 1., "Percent should be in the [0, 1] domain."
 
         return (pd.concat([getattr(self, quantity)[model].quantile(percent).rename(None)
                            for model in model_names], axis=1)
@@ -188,13 +190,27 @@ class Calculator:
 
     def percentile_converter(self, quantity, percent=0.75):
 
-        assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
-
         converter_capacities = self.percentile(quantity, percent)
 
         return (pd.concat([getattr(self, quantity)[model].clip(0, converter_capacities[model], axis=1).sum()
                            for model in model_names], axis=1)
                 .rename(columns=dict(enumerate(model_names))))
+
+    def plot_dendrogram(self, quantity, func, percent=None, **kwargs):
+
+        one_arg_funcs = ['sum', 'normalized_std']
+        two_arg_funcs = ["percentile", "percentile"]
+        all_funcs = one_arg_funcs + two_arg_funcs
+
+        assert func in all_funcs, "Valid functions can only be one of [" + ", ".join(all_funcs) + "]"
+
+        if percent:
+            if func in two_arg_funcs:
+                plots.plot_dendrogram(getattr(self, func)(quantity, percent).transpose(), **kwargs)
+                return
+            else:
+                logger.warning("This function does accept a second argument. It is ignored.")
+        plots.plot_dendrogram(getattr(self, func)(quantity).transpose(), **kwargs)
 
     def pair_distance(self, quantity, metric):
 
@@ -208,6 +224,4 @@ class Calculator:
                                    for mod in model_names], axis=1)
                         .rename(columns=dict(enumerate(model_names))))
                 for model in model_names}
-
-
 
