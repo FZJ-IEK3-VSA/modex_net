@@ -240,3 +240,13 @@ class Calculator:
         return pd.Series([overload_incidents(df) for df in self.line_loadings.values()],
                          index=self.line_loadings.keys())
 
+    def energy_mix_indicator(self):
+
+        def em_indicator(df1, df2):
+            reg_indicator = (df1 - df2).abs().sum().divide(df1.sum())
+            return (reg_indicator * df1.sum()).sum() / df1.sum().sum()
+
+        return pd.concat([pd.Series([em_indicator(self.energy_mix[m1], self.energy_mix[m2]) for m2 in model_names],
+                                    index=model_names)
+                          for m1 in model_names], axis=1).rename(columns=dict(enumerate(model_names)))
+
