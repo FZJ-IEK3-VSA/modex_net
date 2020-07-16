@@ -12,6 +12,9 @@ from matplotlib import pyplot as plt
 from scipy.cluster.hierarchy import dendrogram
 from sklearn.cluster import AgglomerativeClustering
 
+figsize = (8,6)
+linewidth = 2.5
+fontsize = 16
 
 def _plot_dendrogram(model, color_threshold=0.7, **kwargs):
     # from https://scikit-learn.org/stable/auto_examples/cluster/plot_agglomerative_dendrogram.html#sphx-glr-auto-examples-cluster-plot-agglomerative-dendrogram-py
@@ -36,7 +39,7 @@ def _plot_dendrogram(model, color_threshold=0.7, **kwargs):
     dendrogram(linkage_matrix, color_threshold=max(linkage_matrix[:, 2]) * color_threshold, **kwargs)
 
 
-def plot_dendrogram(data, color_threshold=0.7, title=None, figsize=(8,6), linewidth=2.5, fontsize=16,
+def plot_dendrogram(data, color_threshold=0.7, title=None, figsize=figsize, linewidth=linewidth, fontsize=fontsize,
                     xticks_rotation=45, savefig=None, dpi=300, **kwargs):
     """
     Plot a dendrogram from the data. Rows correspond to samples and columns to features.
@@ -62,6 +65,33 @@ def plot_dendrogram(data, color_threshold=0.7, title=None, figsize=(8,6), linewi
     plt.yticks(fontsize=fontsize)
     plt.ylabel('Distance', fontsize=fontsize + 2)
 
-    plt.show()
+    plt.tight_layout()
 
     if savefig: plt.savefig(savefig, dpi=dpi)
+
+    return ax
+
+
+def plot_load_duration_df(df, title=None, ylabel=None, legend=True, figsize=figsize, linewidth=linewidth,
+                          fontsize=fontsize, savefig=None, dpi=300, **kwargs):
+
+    df = df.copy()
+
+    # re-write datetimes in integer format
+    df.index = list(range(len(df.index)))
+
+    df = pd.DataFrame({key: sorted(values, reverse=True) for key, values in df.transpose().iterrows()})
+    df.index.name = 'Time'
+
+    # plotting
+    fig, ax = plt.subplots(figsize=figsize)
+    ax = df.plot(ax=ax, legend=legend, linewidth=linewidth, fontsize=fontsize, **kwargs)
+    ax.set_title(title, fontsize=fontsize+4)
+    ax.set_ylabel(ylabel, fontsize=fontsize+2)
+    ax.set_xlabel('Time', fontsize=fontsize)
+    if legend: ax.legend(loc='best', fancybox=True, framealpha=0.5, fontsize=fontsize)
+
+    plt.tight_layout()
+    if savefig: plt.savefig(savefig, dpi=dpi)
+
+    return ax
