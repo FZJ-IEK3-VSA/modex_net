@@ -97,7 +97,7 @@ def plot_load_duration_df(df, title=None, ylabel=None, legend=True, figsize=figs
     return ax
 
 
-def plot_heatmap(df, quantity, title=None, figsize=(12,8), fontsize=fontsize, **kwargs):
+def plot_heatmap(df, quantity, title=None, figsize=(12,8), fontsize=fontsize, savefig=None, dpi=300, **kwargs):
 
     fig, ax = plt.subplots(1, 1, figsize=figsize)
 
@@ -122,6 +122,8 @@ def plot_heatmap(df, quantity, title=None, figsize=(12,8), fontsize=fontsize, **
     plt.xticks(rotation=-90)
     ax.set_title(title, fontsize=fontsize + 4)
     fig.tight_layout()
+
+    if savefig: plt.savefig(savefig, dpi=dpi)
 
     return ax
 
