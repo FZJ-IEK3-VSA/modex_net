@@ -212,7 +212,7 @@ class Calculator:
                 return
             else:
                 logger.warning("This function does accept a second argument. It is ignored.")
-        plots.plot_dendrogram(getattr(self, func)(quantity).transpose(), **kwargs)
+        return plots.plot_dendrogram(getattr(self, func)(quantity).transpose(), **kwargs)
 
     def pair_distance(self, quantity, metric):
 
@@ -249,4 +249,25 @@ class Calculator:
         return pd.concat([pd.Series([em_indicator(self.energy_mix[m1], self.energy_mix[m2]) for m2 in model_names],
                                     index=model_names)
                           for m1 in model_names], axis=1).rename(columns=dict(enumerate(model_names)))
+
+    def plot_heatmap(self, quantity, metric=None, model=None, **kwargs):
+
+        assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
+
+        if quantity == 'energy_mix':
+            if metric: logger.warning("Metric argument is not used for energy mix. Ignoring it.")
+            if model: logger.warning("Model argument is not used for energy mix. Ignoring it.")
+            df = self.energy_mix_indicator()
+            title = None
+        else:
+            assert metric in metrics.keys(), "Valid metrics can only be one of [" + ", ".join(metrics.keys()) + "]"
+            assert model in model_names, "Valid model names can only be one of [" + ", ".join(model_names) + "]"
+            df = self.pair_distance(quantity, metric)[model]
+            title = model + " model"
+
+        return plots.plot_heatmap(df, quantity=quantity, title=title, **kwargs)
+
+
+
+
 
