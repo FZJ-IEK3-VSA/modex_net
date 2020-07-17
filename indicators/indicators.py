@@ -250,6 +250,20 @@ class Calculator:
                                     index=model_names)
                           for m1 in model_names], axis=1).rename(columns=dict(enumerate(model_names)))
 
+    def plot_energy_mix(self, relative=False, title=None, ylabel=None, ylim=None, **kwargs):
+
+        dfs = [self.energy_mix[m].T for m in self.energy_mix.keys()]
+        if relative:
+            for i in range(len(dfs)):
+                dfs[i] = dfs[i].T.divide(dfs[i].sum(axis=1)).T
+            if ylabel:
+                logger.warning("Removing ylabel for relative values.")
+                ylabel = None
+            ylim = 1.
+
+        return plots.plot_clustered_stacked(dfs, labels=self.energy_mix.keys(), title=title, ylabel=ylabel, ylim=ylim,
+                                            **kwargs)
+
     def plot_heatmap(self, quantity, metric=None, model=None, **kwargs):
 
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"

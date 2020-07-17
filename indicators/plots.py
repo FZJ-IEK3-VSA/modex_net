@@ -12,9 +12,14 @@ from matplotlib import pyplot as plt
 from scipy.cluster.hierarchy import dendrogram
 from sklearn.cluster import AgglomerativeClustering
 
-figsize = (8,6)
+
 linewidth = 2.5
 fontsize = 16
+
+colors_energy_mix = {'Wind': 'mediumblue', 'Solar': 'yellow', 'Hydro': 'dodgerblue', 'Bioenergy': 'green',
+                     'Nuclear': 'purple', 'Lignite': 'saddlebrown', 'Hard Coal': 'black',
+                     'Natural Gas': 'orange', 'Other': 'darkgray', 'Oil': 'red'}
+
 
 def _plot_dendrogram(model, color_threshold=0.7, **kwargs):
     # from https://scikit-learn.org/stable/auto_examples/cluster/plot_agglomerative_dendrogram.html#sphx-glr-auto-examples-cluster-plot-agglomerative-dendrogram-py
@@ -39,7 +44,7 @@ def _plot_dendrogram(model, color_threshold=0.7, **kwargs):
     dendrogram(linkage_matrix, color_threshold=max(linkage_matrix[:, 2]) * color_threshold, **kwargs)
 
 
-def plot_dendrogram(data, color_threshold=0.7, title=None, figsize=figsize, linewidth=linewidth, fontsize=fontsize,
+def plot_dendrogram(data, color_threshold=0.7, title=None, figsize=(8,6), linewidth=linewidth, fontsize=fontsize,
                     xticks_rotation=45, savefig=None, dpi=300, **kwargs):
     """
     Plot a dendrogram from the data. Rows correspond to samples and columns to features.
@@ -72,7 +77,7 @@ def plot_dendrogram(data, color_threshold=0.7, title=None, figsize=figsize, line
     return ax
 
 
-def plot_load_duration_df(df, title=None, ylabel=None, legend=True, figsize=figsize, linewidth=linewidth,
+def plot_load_duration_df(df, title=None, ylabel=None, legend=True, figsize=(8,6), linewidth=linewidth,
                           fontsize=fontsize, savefig=None, dpi=300, **kwargs):
 
     df = df.copy()
@@ -95,6 +100,62 @@ def plot_load_duration_df(df, title=None, ylabel=None, legend=True, figsize=figs
     if savefig: plt.savefig(savefig, dpi=dpi)
 
     return ax
+
+
+# inspired by https://stackoverflow.com/questions/22787209/how-to-have-clusters-of-stacked-bars-with-python-pandas
+def plot_clustered_stacked(dfall, labels=None, figsize=(16,9), title=None, ylabel=None, ylim=None, fontsize=fontsize,
+                           **kwargs):
+    """Given a list of dataframes, with identical columns and index, create a clustered stacked bar plot.
+    labels is a list of the names of the dataframe, used for the legend
+    title is a string for the title of the plot
+    H is the hatch used for identification of the different dataframe"""
+
+    H = "/"
+
+    n_df = len(dfall)
+    n_col = len(dfall[0].columns)
+    n_ind = len(dfall[0].index)
+    fig, axe = plt.subplots(1, 1, figsize=figsize)
+
+    for df in dfall:  # for each data frame
+        axe = df.plot(ax=axe, kind="bar", stacked=True, linewidth=0, legend=False,
+                      color=df.columns.map(colors_energy_mix),**kwargs)  # make bar plots
+
+    patch_width = 1 / float(n_df + 1)
+
+    h, l = axe.get_legend_handles_labels()  # get the handles we want to modify
+    for i in range(0, n_df * n_col, n_col):  # len(h) = n_col * n_df
+        for j, pa in enumerate(h[i:i + n_col]):
+            for rect in pa.patches:  # for each index
+                rect.set_x(rect.get_x() + 1 / float(n_df + 1) * i / float(n_col))
+                rect.set_hatch(H * int(i / n_col))  # edited part
+                rect.set_width(patch_width)
+
+    axe.set_xticks((np.arange(0, n_ind, 1) + patch_width * 2))
+    axe.set_xticklabels(df.index, rotation=0, fontsize=fontsize)
+    plt.yticks(fontsize=fontsize)
+
+    axe.set_xlim(-0.4, axe.get_xticks()[-1] + 0.55)
+    axe.set_ylim(0., ylim)
+    axe.yaxis.grid(True, linestyle='dotted')
+
+    axe.set_title(title, fontsize=fontsize + 4)
+    axe.set_ylabel(ylabel, fontsize=fontsize + 2)
+
+    # Add invisible data to add another legend
+    n = []
+    for i in range(n_df):
+        n.append(axe.bar(0, 0, color="gray", hatch=H * i))
+
+    l1 = axe.legend(h[:n_col], l[:n_col], fontsize=fontsize, bbox_to_anchor=(1, 1))
+    if labels is not None:
+        l2 = plt.legend(n, labels, fontsize=fontsize, bbox_to_anchor=(1, 0.5))
+    axe.add_artist(l1)
+
+    plt.tight_layout()
+    plt.show()
+
+    return axe
 
 
 def plot_heatmap(df, quantity, title=None, figsize=(12,8), fontsize=fontsize, savefig=None, dpi=300, **kwargs):

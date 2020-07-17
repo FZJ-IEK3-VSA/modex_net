@@ -17,3 +17,5 @@ model_names_plot = indicators.model_names_plot
 quantities_time = indicators.quantities_time
 quantities_categorical = indicators.quantities_categorical
 quantities = indicators.quantities
+
+colors_energy_mix=plots.colors_energy_mix
