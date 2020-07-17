@@ -179,7 +179,7 @@ def plot_heatmap(df, quantity, title=None, figsize=(12,8), fontsize=fontsize, sa
 
     im, _ = _heatmap(df.values, df.index.values, df.columns.values, ax=ax, cmap="RdYlGn_r", percent=percent, vmin=vmin,
                      vmax=vmax, valfmt=valfmt, cbarlabel=cbarlabel, fontsize=fontsize, **kwargs)
-    _annotate_heatmap(im, valfmt=valfmt, size=fontsize, threshold=20, textcolors=["white", "black"])
+    _annotate_heatmap(im, valfmt=valfmt, size=fontsize, threshold=0.2*vmax, textcolors=["white", "black"])
     plt.xticks(rotation=-90)
     ax.set_title(title, fontsize=fontsize + 4)
     fig.tight_layout()
@@ -231,7 +231,7 @@ def _heatmap(data, row_labels, col_labels, percent=True, vmin=0, vmax=100, valfm
     if percent:
         cbar.ax.set_yticklabels([str(i)+'%' for i in range(0, 120, 20)], fontsize=fontsize)
     else:
-        cbar.ax.set_yticklabels([valfmt.replace('x', '').format(i) for i in np.linspace(vmin, vmax, 7)],
+        cbar.ax.set_yticklabels([valfmt.replace('x', '').format(i) for i in np.linspace(vmin, vmax, len(cbar.ax.get_yticks()))],
                                 fontsize=fontsize)
 
     # We want to show all ticks...
