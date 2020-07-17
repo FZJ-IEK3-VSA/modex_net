@@ -279,7 +279,7 @@ class Calculator:
             df = self.pair_distance(quantity, metric)[model]
             title = model + " model"
 
-        return plots.plot_heatmap(df, quantity=quantity, title=title, **kwargs)
+        return plots.plot_heatmap(df, quantity=quantity, metric=metric, title=title, **kwargs)
 
 
 

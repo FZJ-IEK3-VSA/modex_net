@@ -158,11 +158,12 @@ def plot_clustered_stacked(dfall, labels=None, figsize=(16,9), title=None, ylabe
     return axe
 
 
-def plot_heatmap(df, quantity, title=None, figsize=(12,8), fontsize=fontsize, savefig=None, dpi=300, **kwargs):
+def plot_heatmap(df, quantity, metric=None, title=None, figsize=(12,8), fontsize=fontsize, savefig=None, dpi=300, **kwargs):
 
     fig, ax = plt.subplots(1, 1, figsize=figsize)
 
     valfmt = "{x:.1f}"
+    cmap = "RdYlGn_r"
     if quantity == 'energy_mix':
         df = df.multiply(100)
         percent = True
@@ -170,6 +171,8 @@ def plot_heatmap(df, quantity, title=None, figsize=(12,8), fontsize=fontsize, sa
         vmax = 100.
         cbarlabel = "Percentage"
     else:
+        if metric == 'correlation':
+            cmap = "RdYlGn"
         percent = False
         vmin = df.min().min()
         vmax = df.max().max()
@@ -177,9 +180,15 @@ def plot_heatmap(df, quantity, title=None, figsize=(12,8), fontsize=fontsize, sa
         if vmax < 1.:
             valfmt = "{x:.2f}"
 
-    im, _ = _heatmap(df.values, df.index.values, df.columns.values, ax=ax, cmap="RdYlGn_r", percent=percent, vmin=vmin,
+    threshold = 0.2 * vmax
+    textcolors = ["white", "black"]
+    if metric == 'correlation':
+        threshold = 0.8 * vmax
+        textcolors = ["black", "white"]
+
+    im, _ = _heatmap(df.values, df.index.values, df.columns.values, ax=ax, cmap=cmap, percent=percent, vmin=vmin,
                      vmax=vmax, valfmt=valfmt, cbarlabel=cbarlabel, fontsize=fontsize, **kwargs)
-    _annotate_heatmap(im, valfmt=valfmt, size=fontsize, threshold=0.2*vmax, textcolors=["white", "black"])
+    _annotate_heatmap(im, valfmt=valfmt, size=fontsize, threshold=threshold, textcolors=textcolors)
     plt.xticks(rotation=-90)
     ax.set_title(title, fontsize=fontsize + 4)
     fig.tight_layout()
