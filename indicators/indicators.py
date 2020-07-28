@@ -33,8 +33,8 @@ quantities_time = [
                    "emissions",            # Dataframes, time/regions
                    "load_curtailments",    # Dataframes, time/regions
 
-                   "storage_discharging",  # Dataframes, time/regions
-                   "storage_charging",     # Dataframes, time/regions
+                   "storage_p",            # Dataframes, time/regions
+                   "storage_soc",          # Dataframes, time/regions
 
                    "import_export",        # Dataframes, time/interconnections
                    "line_loadings",        # Dataframes, time/lines
@@ -143,11 +143,10 @@ class Calculator:
     emissions = _quantity_get_set("emissions")
     load_curtailments = _quantity_get_set("load_curtailments")
 
-    storage_discharging = _quantity_get_set("storage_discharging")
-    storage_charging = _quantity_get_set("storage_charging")
+    storage_p = _quantity_get_set("storage_p")
+    storage_soc = _quantity_get_set("storage_soc")
 
-    exports = _quantity_get_set("exports")
-    imports = _quantity_get_set("imports")
+    import_export = _quantity_get_set("import_export")
     line_loadings = _quantity_get_set("line_loadings")
 
     electricity_prices = _quantity_get_set("electricity_prices")
@@ -208,10 +207,9 @@ class Calculator:
 
         if percent:
             if func in two_arg_funcs:
-                plots.plot_dendrogram(getattr(self, func)(quantity, percent).transpose(), **kwargs)
-                return
+                return plots.plot_dendrogram(getattr(self, func)(quantity, percent).transpose(), **kwargs)
             else:
-                logger.warning("This function does accept a second argument. It is ignored.")
+                logger.warning("This function does not  accept a second argument. It is ignored.")
         return plots.plot_dendrogram(getattr(self, func)(quantity).transpose(), **kwargs)
 
     def pair_distance(self, quantity, metric):
