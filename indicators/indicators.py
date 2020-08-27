@@ -98,6 +98,24 @@ metrics = {'wasserstein': wasserstein,
            'correlation': corr}
 
 
+def zeros_df_t(year, index_name, level="market", columns=None):
+    # return zeros dataframe
+    if index_name == "snapshots":
+        index = pd.date_range(str(year) + "-01-01", str(year + 1) + "-01-01", freq='h')[:-1]
+    elif index_name == "carrier":
+        index = plots.colors_energy_mix.keys()
+    else:
+        raise ValueError("index_name can only be either snapshots or carrier")
+    if columns is None:
+        if level == "market":
+            columns = eu_neighs_ISO2 + ["DE"]
+        elif level == "grid":
+            columns = de_nuts1
+    df = pd.DataFrame(np.zeros((len(index), len(columns))), index=index, columns=columns)
+    df.index.name = index_name
+    return df
+
+
 class Calculator:
 
     def _quantity_get_set(quantity):
@@ -108,20 +126,73 @@ class Calculator:
             for model in model_names:
 
                 if getattr(self, '_'+quantity)[model].empty:
-                    logger.info(str(quantity)+" data for "+str(model)+" is empty. Loading from "+str(self.data_source))
+                    logger.info(quantity + " data for " + model+" is empty. Loading from " + self.data_source)
 
                     if self.data_source == "csv":
 
-                        data_path = os.path.join(os.path.dirname(__file__), "..", "data", str(self.scenario), model,
-                                                 quantity+".csv")
+                        data_path = os.path.join(self.data_path, model, quantity + ".csv")
 
                         if quantity in quantities_time:
-                            getattr(self, '_'+quantity).update({model: pd.read_csv(data_path,
-                                                                                   index_col='snapshots',
-                                                                                   parse_dates=True)})
-                        if quantity in quantities_categorical:
-                            getattr(self, '_'+quantity).update({model: pd.read_csv(data_path,
-                                                                               index_col='carrier')})
+                            index_name = "snapshots"
+                        elif quantity in quantities_categorical:
+                            index_name = "carrier"
+                        else:
+                            raise ValueError(quantity + " not in [" + ", ".join(quantities) + "]")
+
+                        df_0 = zeros_df_t(self.year, index_name, self.level)
+                        try:
+                            df = pd.read_csv(data_path, index_col=index_name, parse_dates=True).fillna(0.)
+                            self.warning_flags.at[model, quantity] = "Ok."
+                        except FileNotFoundError:
+                            logger.error(quantity + " for model " + model + " was not found. Returning zeros.")
+                            self.warning_flags.at[model, quantity] = "Missing file. Zeros"
+                            df = zeros_df_t(self.year, index_name, self.level)
+                        except ValueError:
+                            df = pd.read_csv(data_path).fillna(0.)
+                            df.rename(columns=dict(zip(df.columns, df.columns.str.strip())), inplace=True)
+                            df.to_csv(data_path, index=False)  # fix for future parses
+                            if index_name not in df.columns:
+                                df_columns = df.rename(columns=dict(zip(df.columns, df.columns.str.upper()))).columns
+                                diff_cols = df_columns.difference(df_0.columns)
+                                if len(diff_cols) == 1:
+                                    new_index_col = df.columns[df_columns == diff_cols[0]][0]
+                                    logger.warning(
+                                        quantity + " " + index_name + " was not found in the file for model " + model
+                                        + ". Attempting to use " + str(new_index_col) + " as index.")
+                                else:
+                                    new_index_col = 0
+                            else:
+                                new_index_col = index_name
+
+                            if new_index_col == 0:
+                                logger.error(
+                                    quantity + " " + index_name + " were not found in the file for model " + model +
+                                    "and cannot select from remaining columns. Returning zeros.")
+                                self.warning_flags.at[model, quantity] = "Missing index. Zeros"
+                                df = zeros_df_t(self.year, index_name, self.level)
+                            else:
+                                df = pd.read_csv(data_path, index_col=new_index_col, parse_dates=True).fillna(0.)
+                                df.index.name = index_name
+                                df.to_csv(data_path)  # fix for future parses
+                                self.warning_flags.at[model, quantity] = "Ok."
+
+                        # make sure columns are in capital letters
+                        df.rename(columns=dict(zip(df.columns, df.columns.str.upper())), inplace=True)
+
+                        # fit dataframe to desired format
+                        if not df_0.index.difference(df.index).empty:
+                            logger.warning("Missing " + index_name + " for " + quantity + " in model " + model +
+                                           ". Filling with zeros.")
+                            self.warning_flags.at[model, quantity] = "Partly broken."
+                        if not df_0.columns.difference(df.columns).empty:
+                            logger.warning("Missing columns for " + quantity + " in model " + model +
+                                           ". Filling with zeros.")
+                            self.warning_flags.at[model, quantity] = "Partly broken."
+                        df = df[df.columns.intersection(df_0.columns)].reindex(df_0.index, fill_value=0)
+                        missing_cols = df_0.columns.difference(df.columns)
+                        df = pd.concat([df, zeros_df_t(self.year, index_name, columns=missing_cols)], axis=1)
+
+                        getattr(self, '_' + quantity).update({model: df})
 
                     elif self.data_source == "oep":
                         pass
@@ -154,16 +225,33 @@ class Calculator:
 
     energy_mix = _quantity_get_set("energy_mix")
 
-    def __init__(self, scenario, data_source="csv"):
+    def __init__(self, year, level, scenario, data_source="csv"):
 
         logging.basicConfig(level=logging.INFO)
         logger.info("All methods assume hourly profiles.")
 
+        if year not in [2016, 2030]:
+            raise ValueError("year can only be either 2016 or 2030")
+        self.year = year
+        if level not in ["market", "grid"]:
+            raise ValueError("level can only be either market or grid")
+        self.level = level
         self.scenario = scenario
+        if data_source not in ["csv", "oep"]:
+            raise ValueError("data_source can only be either csv or oep")
         self.data_source = data_source
+
+        self.data_path = ""
+        if self.data_source == "csv":
+            self.data_path = os.path.join(os.path.dirname(__file__), "..", "data", str(self.year), self.level,
+                                          str(self.scenario))
+            if not os.path.isdir(self.data_path):
+                raise FileNotFoundError("scenario folder "+self.scenario+" was not found")
 
         for quantity in quantities:
             setattr(self, quantity, dict(zip(model_names, [pd.DataFrame()]*len(model_names))))
+
+        self.warning_flags = pd.DataFrame(index=model_names, columns=quantities).fillna("Unknown.")
 
     def sum(self, quantity):
 
