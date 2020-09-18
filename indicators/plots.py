@@ -16,9 +16,45 @@ from sklearn.cluster import AgglomerativeClustering
 linewidth = 2.5
 fontsize = 16
 
-colors_energy_mix = {'Wind': 'mediumblue', 'Solar': 'yellow', 'Hydro': 'dodgerblue', 'Bioenergy': 'green',
-                     'Nuclear': 'purple', 'Lignite': 'saddlebrown', 'Hard Coal': 'black',
-                     'Natural Gas': 'orange', 'Other': 'darkgray', 'Oil': 'red'}
+colors_energy_mix = {'Wind': 'mediumblue',
+                     'Wind Onshore': 'blue',
+                     'Wind Offshore': 'mediumblue',
+                     'Solar': 'yellow',
+                     'Hydro': 'dodgerblue',
+                     'Run of River': 'deepskyblue',
+                     'Reservoir': 'dodgerblue',
+                     'Pumped Hydro Storage': 'lightskyblue',
+                     'Bioenergy': 'green',
+                     'Nuclear': 'purple',
+                     'Lignite': 'saddlebrown',
+                     'Hard Coal': 'black',
+                     'Natural Gas': 'orange',
+                     'Other': 'darkgray',
+                     'Other Conventional': 'darkgray',
+                     'Other Renewable': 'lime',
+                     'Oil': 'red',
+                     'Geothermal': 'gold',
+                     'Waste': 'lightgray',
+                     'Batteries': 'pink',
+                     'Hydrogen': 'hotpink',
+                     'Storage': 'hotpink'}
+
+aggregate_carriers = {'Wind Onshore': 'Wind',
+                      'Wind Offshore': 'Wind',
+                      'Solar': 'Solar',
+                      'Run of River': 'Hydro',
+                      'Reservoir': 'Hydro',
+                      'Pumped Hydro Storage': 'Hydro',
+                      'Bioenergy': 'Bioenergy',
+                      'Nuclear': 'Nuclear',
+                      'Lignite': 'Lignite',
+                      'Hard Coal': 'Hard Coal',
+                      'Natural Gas': 'Natural Gas',
+                      'Other Conventional': 'Other',
+                      'Other Renewable': 'Other',
+                      'Oil': 'Oil',
+                      'Geothermal': 'Other',
+                      'Waste': 'Other'}
 
 
 def _plot_dendrogram(model, color_threshold=0.7, **kwargs):
@@ -149,7 +185,7 @@ def plot_clustered_stacked(dfall, labels=None, figsize=(16,9), title=None, ylabe
 
     l1 = axe.legend(h[:n_col], l[:n_col], fontsize=fontsize, bbox_to_anchor=(1, 1))
     if labels is not None:
-        l2 = plt.legend(n, labels, fontsize=fontsize, bbox_to_anchor=(1, 0.5))
+        l2 = plt.legend(n, labels, fontsize=fontsize, bbox_to_anchor=(1, 0.35))
     axe.add_artist(l1)
 
     plt.tight_layout()

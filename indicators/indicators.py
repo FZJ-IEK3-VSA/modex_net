@@ -103,7 +103,7 @@ def zeros_df_t(year, index_name, level="market", columns=None):
     if index_name == "snapshots":
         index = pd.date_range(str(year) + "-01-01", str(year + 1) + "-01-01", freq='h')[:-1]
     elif index_name == "carrier":
-        index = plots.colors_energy_mix.keys()
+        index = plots.aggregate_carriers.keys()
     else:
         raise ValueError("index_name can only be either snapshots or carrier")
     if columns is None:
@@ -253,6 +253,11 @@ class Calculator:
 
         self.warning_flags = pd.DataFrame(index=model_names, columns=quantities).fillna("Unknown.")
 
+        self.entsoe_mix = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "data",
+                                                   "entso-e-energy-mix-modex.csv"), index_col='carrier')
+        self.entsoe_flows = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "data",
+                                                     "entso-e-import_2016.csv"), index_col='name')['Import']
+
     def sum(self, quantity):
 
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
@@ -336,9 +341,18 @@ class Calculator:
                                     index=model_names)
                           for m1 in model_names], axis=1).rename(columns=dict(enumerate(model_names)))
 
-    def plot_energy_mix(self, relative=False, title=None, ylabel=None, ylim=None, **kwargs):
+    def plot_energy_mix(self, relative=False, aggregate=False, entsoe=True, title=None, ylabel=None, ylim=None, **kwargs):
 
         dfs = [self.energy_mix[m].T for m in self.energy_mix.keys()]
+        labels = list(self.energy_mix.keys())
+
+        if entsoe and self.year == 2016:
+            dfs.append(self.entsoe_mix.T)
+            labels.append("ENTSO-E")
+
+        if aggregate:
+            dfs = [df.groupby(plots.aggregate_carriers, axis=1).sum() for df in dfs]
+
         if relative:
             for i in range(len(dfs)):
                 dfs[i] = dfs[i].T.divide(dfs[i].sum(axis=1)).T
@@ -347,7 +361,7 @@ class Calculator:
                 ylabel = None
             ylim = 1.
 
-        return plots.plot_clustered_stacked(dfs, labels=self.energy_mix.keys(), title=title, ylabel=ylabel, ylim=ylim,
+        return plots.plot_clustered_stacked(dfs, labels=labels, title=title, ylabel=ylabel, ylim=ylim,
                                             **kwargs)
 
     def plot_heatmap(self, quantity, metric=None, model=None, **kwargs):
