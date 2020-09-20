@@ -16,45 +16,51 @@ from sklearn.cluster import AgglomerativeClustering
 linewidth = 2.5
 fontsize = 16
 
-colors_energy_mix = {'Wind': 'mediumblue',
-                     'Wind Onshore': 'blue',
-                     'Wind Offshore': 'mediumblue',
-                     'Solar': 'yellow',
+colors_energy_mix = {'Nuclear': 'purple',
+                     'Lignite': 'saddlebrown',
+                     'Hard Coal': 'black',
+                     'Natural Gas': 'orange',
                      'Hydro': 'dodgerblue',
                      'Run of River': 'deepskyblue',
                      'Reservoir': 'dodgerblue',
                      'Pumped Hydro Storage': 'lightskyblue',
+                     'Wind': 'mediumblue',
+                     'Wind Onshore': 'royalblue',
+                     'Wind Offshore': 'mediumblue',
+                     'Solar': 'yellow',
                      'Bioenergy': 'green',
-                     'Nuclear': 'purple',
-                     'Lignite': 'saddlebrown',
-                     'Hard Coal': 'black',
-                     'Natural Gas': 'orange',
+                     'Oil': 'red',
                      'Other': 'darkgray',
                      'Other Conventional': 'darkgray',
                      'Other Renewable': 'lime',
-                     'Oil': 'red',
                      'Geothermal': 'gold',
                      'Waste': 'lightgray',
                      'Batteries': 'pink',
                      'Hydrogen': 'hotpink',
                      'Storage': 'hotpink'}
 
-aggregate_carriers = {'Wind Onshore': 'Wind',
-                      'Wind Offshore': 'Wind',
-                      'Solar': 'Solar',
-                      'Run of River': 'Hydro',
-                      'Reservoir': 'Hydro',
-                      'Pumped Hydro Storage': 'Hydro',
-                      'Bioenergy': 'Bioenergy',
-                      'Nuclear': 'Nuclear',
+aggregate_carriers = {'Nuclear': 'Nuclear',
                       'Lignite': 'Lignite',
                       'Hard Coal': 'Hard Coal',
                       'Natural Gas': 'Natural Gas',
-                      'Other Conventional': 'Other',
-                      'Other Renewable': 'Other',
+                      'Hydro': 'Hydro',
+                      'Reservoir': 'Hydro',
+                      'Run of River': 'Hydro',
+                      'Pumped Hydro Storage': 'Hydro',
+                      'Wind': 'Wind',
+                      'Wind Offshore': 'Wind',
+                      'Wind Onshore': 'Wind',
+                      'Solar': 'Solar',
+                      'Bioenergy': 'Bioenergy',
                       'Oil': 'Oil',
+                      'Other': 'Other',
                       'Geothermal': 'Other',
-                      'Waste': 'Other'}
+                      'Waste': 'Other',
+                      'Other Conventional': 'Other',
+                      'Other Renewable': 'Other'}
+
+carriers_reduced = ['Nuclear', 'Lignite', 'Hard Coal', 'Natural Gas', 'Hydro', 'Wind', 'Solar', 'Bioenergy', 'Oil',
+                    'Other']
 
 
 def _plot_dendrogram(model, color_threshold=0.7, **kwargs):
@@ -149,13 +155,13 @@ def plot_clustered_stacked(dfall, labels=None, figsize=(16,9), title=None, ylabe
     H = "/"
 
     n_df = len(dfall)
-    n_col = len(dfall[0].columns)
-    n_ind = len(dfall[0].index)
+    n_col = max([len(df.columns) for df in dfall])
+    n_ind = max([len(df.index) for df in dfall])
     fig, axe = plt.subplots(1, 1, figsize=figsize)
 
     for df in dfall:  # for each data frame
         axe = df.plot(ax=axe, kind="bar", stacked=True, linewidth=0, legend=False,
-                      color=df.columns.map(colors_energy_mix),**kwargs)  # make bar plots
+                      color=df.columns.map(colors_energy_mix), **kwargs)  # make bar plots
 
     patch_width = 1 / float(n_df + 1)
 

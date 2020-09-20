@@ -19,3 +19,4 @@ quantities_categorical = indicators.quantities_categorical
 quantities = indicators.quantities
 
 carriers = list(plots.aggregate_carriers.keys())
+carriers_reduced = plots.carriers_reduced
