@@ -261,8 +261,12 @@ class Calculator:
         self.entsoe_mix = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "data",
                                                    "entso-e-energy-mix-modex.csv"),
                                       index_col='carrier').reindex(plots.aggregate_carriers.keys())
-        self.entsoe_flows = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "data",
-                                                     "entso-e-import_2016.csv"), index_col='name')['Import']
+        self.entsoe_factsheets_net_balance = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "data",
+                                                                      "entsoe_factsheets-net-balance-2016.csv"),
+                                                         index_col='name')['imp-exp']
+        self.entsoe_factsheets_net_exchanges = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "data",
+                                                                        "entsoe_factsheets-net-exchanges-2016.csv"),
+                                                           index_col='name')['exchange']
 
     def sum(self, quantity):
 
