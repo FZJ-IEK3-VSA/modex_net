@@ -18,5 +18,5 @@ quantities_time = indicators.quantities_time
 quantities_categorical = indicators.quantities_categorical
 quantities = indicators.quantities
 
-carriers = list(plots.aggregate_carriers.keys())
-carriers_reduced = plots.carriers_reduced
+carriers = indicators.carriers_all
+carriers_reduced = indicators.carriers_reduced

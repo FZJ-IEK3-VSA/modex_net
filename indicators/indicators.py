@@ -30,6 +30,12 @@ model_names = ["europower", "perseus", "mars", "powerflex", "ego", "miles", "isa
 model_names_plot = pd.Series(["Europower", "Perseus/Tango", "MarS/ZKNOT", "Powerflex-Grid-EU",
                               "eGo/eTraGo", "MILES", "ISAaR", "ELMOD"], index=model_names)
 
+carriers_reduced = ['Nuclear', 'Lignite', 'Hard Coal', 'Natural Gas', 'Hydro', 'Wind', 'Solar', 'Bioenergy', 'Oil',
+                    'Other']
+carriers_all = ['Nuclear', 'Lignite', 'Hard Coal', 'Natural Gas', 'Run of River', 'Reservoir', 'Pumped Hydro Storage',
+                'Wind Onshore', 'Wind Offshore', 'Solar', 'Bioenergy', 'Oil', 'Geothermal', 'Waste',
+                'Other Conventional', 'Other Renewable']
+
 quantities_time = [
                    "vres_curtailments",    # Dataframes, time/regions
                    "redispatch_vol",       # Dataframes, time/regions
@@ -106,7 +112,7 @@ def zeros_df_t(year, index_name, level="market", columns=None, quantity=None):
     if index_name == "snapshots":
         index = pd.date_range(str(year) + "-01-01", str(year + 1) + "-01-01", freq='h')[:-1]
     elif index_name == "carrier":
-        index = plots.aggregate_carriers.keys()
+        index = carriers_all
     else:
         raise ValueError("index_name can only be either snapshots or carrier")
     if columns is None:
@@ -195,9 +201,12 @@ class Calculator:
                                            ". Filling with zeros.")
                             self.warning_flags.at[model, quantity] = "Partly broken."
                         missing_cols = df_0.columns.difference(df.columns)
-                        df = pd.concat([df, zeros_df_t(self.year, index_name, columns=missing_cols)], axis=1)
+                        existing_cols = df_0.columns.intersection(df.columns)
+                        df = pd.concat([df[existing_cols].reindex(df_0.index),
+                                        zeros_df_t(self.year, index_name, columns=missing_cols)],
+                                       axis=1)
 
-                        getattr(self, '_' + quantity).update({model: df})
+                        getattr(self, '_' + quantity).update({model: df.fillna(0)})
 
                     elif self.data_source == "oep":
                         pass
@@ -260,7 +269,7 @@ class Calculator:
 
         self.entsoe_mix = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "data",
                                                    "entso-e-energy-mix-modex.csv"),
-                                      index_col='carrier').reindex(plots.aggregate_carriers.keys())
+                                      index_col='carrier').reindex(carriers_all)
         self.entsoe_factsheets_net_balance = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "data",
                                                                       "entsoe_factsheets-net-balance-2016.csv"),
                                                          index_col='name')['imp-exp']
@@ -364,7 +373,7 @@ class Calculator:
             agg_dict = plots.aggregate_carriers.copy()
             #agg_dict.update({'Wind': 'Wind', 'Hydro': 'Hydro', 'Other': 'Other'})
             dfs = [df.groupby(agg_dict, axis=1).sum() for df in dfs]
-            dfs = [df[sorted(df.columns, key=lambda s:  [i for i, x in enumerate(plots.carriers_reduced) if x == s])]
+            dfs = [df[sorted(df.columns, key=lambda s:  [i for i, x in enumerate(carriers_reduced) if x == s])]
                    for df in dfs]  # sort carriers
 
         if relative:
@@ -377,9 +386,8 @@ class Calculator:
 
         dfs = [df.reindex(dfs[0].index.sort_values()) for df in dfs]  # align indices by sorting them
 
-        plots.plot_clustered_stacked(dfs, labels=labels, title=title, ylabel=ylabel, ylim=ylim,
+        return plots.plot_clustered_stacked(dfs, labels=labels, title=title, ylabel=ylabel, ylim=ylim,
                                             **kwargs)
-        return dfs
 
     def plot_heatmap(self, quantity, metric=None, model=None, **kwargs):
 

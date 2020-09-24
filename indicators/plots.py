@@ -59,9 +59,6 @@ aggregate_carriers = {'Nuclear': 'Nuclear',
                       'Other Conventional': 'Other',
                       'Other Renewable': 'Other'}
 
-carriers_reduced = ['Nuclear', 'Lignite', 'Hard Coal', 'Natural Gas', 'Hydro', 'Wind', 'Solar', 'Bioenergy', 'Oil',
-                    'Other']
-
 
 def _plot_dendrogram(model, color_threshold=0.7, **kwargs):
     # from https://scikit-learn.org/stable/auto_examples/cluster/plot_agglomerative_dendrogram.html#sphx-glr-auto-examples-cluster-plot-agglomerative-dendrogram-py
