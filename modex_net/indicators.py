@@ -6,6 +6,7 @@
 import os
 import pandas as pd
 import numpy as np
+import calendar
 from scipy.stats import wasserstein_distance, gaussian_kde
 
 from . import plots, config
@@ -89,7 +90,10 @@ metrics = {'wasserstein': wasserstein,
 def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None):
     # return zeros dataframe
     if index_name == "snapshots":
-        index = pd.date_range(str(year) + "-01-01", str(year + 1) + "-01-01", freq='h')[:-1]
+        drop_hours = 1
+        if calendar.isleap(year) and not config.leap_years:
+            drop_hours = 25
+        index = pd.date_range(str(year) + "-01-01", str(year + 1) + "-01-01", freq='h')[:-drop_hours]
     elif index_name == "carrier":
         index = config.carriers_all
     else:

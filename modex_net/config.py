@@ -6,6 +6,7 @@
 import os
 import pandas as pd
 
+leap_years = False  # if false, the last day of leap years is dropped
 
 dir_name = os.path.dirname(__file__)
 de_nuts1 = pd.read_csv(os.path.join(dir_name, "config_files", "de_nuts1.csv"), encoding='ISO-8859-1')
