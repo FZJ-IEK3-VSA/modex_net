@@ -12,52 +12,7 @@ from matplotlib import pyplot as plt
 from scipy.cluster.hierarchy import dendrogram
 from sklearn.cluster import AgglomerativeClustering
 
-
-linewidth = 2.5
-fontsize = 16
-
-colors_energy_mix = {'Nuclear': 'purple',
-                     'Lignite': 'saddlebrown',
-                     'Hard Coal': 'black',
-                     'Natural Gas': 'orange',
-                     'Hydro': 'dodgerblue',
-                     'Run of River': 'deepskyblue',
-                     'Reservoir': 'dodgerblue',
-                     'Pumped Hydro Storage': 'lightskyblue',
-                     'Wind': 'mediumblue',
-                     'Wind Onshore': 'royalblue',
-                     'Wind Offshore': 'mediumblue',
-                     'Solar': 'yellow',
-                     'Bioenergy': 'green',
-                     'Oil': 'red',
-                     'Other': 'darkgray',
-                     'Other Conventional': 'darkgray',
-                     'Other Renewable': 'lime',
-                     'Geothermal': 'gold',
-                     'Waste': 'lightgray',
-                     'Batteries': 'pink',
-                     'Hydrogen': 'hotpink',
-                     'Storage': 'hotpink'}
-
-aggregate_carriers = {'Nuclear': 'Nuclear',
-                      'Lignite': 'Lignite',
-                      'Hard Coal': 'Hard Coal',
-                      'Natural Gas': 'Natural Gas',
-                      'Hydro': 'Hydro',
-                      'Reservoir': 'Hydro',
-                      'Run of River': 'Hydro',
-                      'Pumped Hydro Storage': 'Hydro',
-                      'Wind': 'Wind',
-                      'Wind Offshore': 'Wind',
-                      'Wind Onshore': 'Wind',
-                      'Solar': 'Solar',
-                      'Bioenergy': 'Bioenergy',
-                      'Oil': 'Oil',
-                      'Other': 'Other',
-                      'Geothermal': 'Other',
-                      'Waste': 'Other',
-                      'Other Conventional': 'Other',
-                      'Other Renewable': 'Other'}
+from . import config
 
 
 def _plot_dendrogram(model, color_threshold=0.7, **kwargs):
@@ -83,8 +38,8 @@ def _plot_dendrogram(model, color_threshold=0.7, **kwargs):
     dendrogram(linkage_matrix, color_threshold=max(linkage_matrix[:, 2]) * color_threshold, **kwargs)
 
 
-def plot_dendrogram(data, color_threshold=0.7, title=None, figsize=(8,6), linewidth=linewidth, fontsize=fontsize,
-                    xticks_rotation=45, savefig=None, dpi=300, **kwargs):
+def plot_dendrogram(data, color_threshold=0.7, title=None, figsize=(8,6), linewidth=config.linewidth,
+                    fontsize=config.fontsize, xticks_rotation=45, savefig=None, dpi=300, **kwargs):
     """
     Plot a dendrogram from the data. Rows correspond to samples and columns to features.
     """
@@ -116,8 +71,8 @@ def plot_dendrogram(data, color_threshold=0.7, title=None, figsize=(8,6), linewi
     return ax
 
 
-def plot_load_duration_df(df, title=None, ylabel=None, legend=True, figsize=(8,6), linewidth=linewidth,
-                          fontsize=fontsize, savefig=None, dpi=300, **kwargs):
+def plot_load_duration_df(df, title=None, ylabel=None, legend=True, figsize=(8,6), linewidth=config.linewidth,
+                          fontsize=config.fontsize, savefig=None, dpi=300, **kwargs):
 
     df = df.copy()
 
@@ -142,8 +97,8 @@ def plot_load_duration_df(df, title=None, ylabel=None, legend=True, figsize=(8,6
 
 
 # inspired by https://stackoverflow.com/questions/22787209/how-to-have-clusters-of-stacked-bars-with-python-pandas
-def plot_clustered_stacked(dfall, labels=None, figsize=(16,9), title=None, ylabel=None, ylim=None, fontsize=fontsize,
-                           **kwargs):
+def plot_clustered_stacked(dfall, labels=None, figsize=(16,9), title=None, ylabel=None, ylim=None,
+                           fontsize=config.fontsize, **kwargs):
     """Given a list of dataframes, with identical columns and index, create a clustered stacked bar plot.
     labels is a list of the names of the dataframe, used for the legend
     title is a string for the title of the plot
@@ -158,7 +113,7 @@ def plot_clustered_stacked(dfall, labels=None, figsize=(16,9), title=None, ylabe
 
     for df in dfall:  # for each data frame
         axe = df.plot(ax=axe, kind="bar", stacked=True, linewidth=0, legend=False,
-                      color=df.columns.map(colors_energy_mix), **kwargs)  # make bar plots
+                      color=df.columns.map(config.colors_energy_mix), **kwargs)  # make bar plots
 
     patch_width = 1 / float(n_df + 1)
 
@@ -197,7 +152,8 @@ def plot_clustered_stacked(dfall, labels=None, figsize=(16,9), title=None, ylabe
     return axe
 
 
-def plot_heatmap(df, quantity, metric=None, title=None, figsize=(12,8), fontsize=fontsize, savefig=None, dpi=300, **kwargs):
+def plot_heatmap(df, quantity, metric=None, title=None, figsize=(12,8), fontsize=config.fontsize, savefig=None, dpi=300,
+                 **kwargs):
 
     fig, ax = plt.subplots(1, 1, figsize=figsize)
 
@@ -239,7 +195,7 @@ def plot_heatmap(df, quantity, metric=None, title=None, figsize=(12,8), fontsize
 
 # heatmap fucnctions from https://matplotlib.org/3.1.1/gallery/images_contours_and_fields/image_annotated_heatmap.html
 def _heatmap(data, row_labels, col_labels, percent=True, vmin=0, vmax=100, valfmt="{x:.2f}", ax=None,
-            cbar_kw={}, cbarlabel="", fontsize=fontsize, **kwargs):
+            cbar_kw={}, cbarlabel="", fontsize=config.fontsize, **kwargs):
     """
     Create a heatmap from a numpy array and two lists of labels.
 
@@ -279,7 +235,8 @@ def _heatmap(data, row_labels, col_labels, percent=True, vmin=0, vmax=100, valfm
     if percent:
         cbar.ax.set_yticklabels([str(i)+'%' for i in range(0, 120, 20)], fontsize=fontsize)
     else:
-        cbar.ax.set_yticklabels([valfmt.replace('x', '').format(i) for i in np.linspace(vmin, vmax, len(cbar.ax.get_yticks()))],
+        cbar.ax.set_yticklabels([valfmt.replace('x', '').format(i) for i in
+                                 np.linspace(vmin, vmax, len(cbar.ax.get_yticks()))],
                                 fontsize=fontsize)
 
     # We want to show all ticks...
@@ -307,7 +264,8 @@ def _heatmap(data, row_labels, col_labels, percent=True, vmin=0, vmax=100, valfm
     ax.tick_params(which="minor", bottom=False, left=False)
 
     return im, cbar
-#%%
+
+
 def _annotate_heatmap(im, data=None, valfmt="{x:.2f}",
                      textcolors=["black", "white"],
                      threshold=None, **textkw):

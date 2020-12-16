@@ -8,33 +8,12 @@ import pandas as pd
 import numpy as np
 from scipy.stats import wasserstein_distance, gaussian_kde
 
-from . import plots
+from . import plots, config
 
 import logging
 logger = logging.getLogger(__name__)
 
-de_nuts1 = ["DE1", "DE2", "DE3", "DE4", "DE5", "DE6", "DE7", "DE8", "DE9", "DEA", "DEB", "DEC", "DED", "DEE", "DEF", "DEG"]
-de_nuts1_names = pd.Series(["Baden-Württemberg", "Bayern", "Berlin", "Brandenburg", "Bremen", "Hamburg", "Hessen",
-                            "Mecklenburg-Vorpommern", "Niedersachsen", "Nordrhein-Westfalen", "Rheinland-Pfalz",
-                            "Saarland", "Sachsen", "Sachsen-Anhalt", "Schleswig-Holstein", "Thüringen"],
-                           index=de_nuts1)
-
-eu_neighs_ISO2 = ["AT", "BE", "CH", "CZ", "DK", "FR", "LU", "NL", "NO", "PL", "SE"]
-eu_neighs_names = pd.Series(["Austria", "Belgium", "Switzerland", "Czechia", "Denmark", "France", "Luxemburg",
-                             "Netherlands", "Norway", "Poland", "Sweden"], index=eu_neighs_ISO2)
-eu_neighs_conns = ["AT-CH", "AT-CZ", "AT-DE", "BE-DE", "BE-FR", "BE-LU", "BE-NL", "CH-DE", "CH-FR", "CZ-DE", "CZ-PL",
-                   "DE-DK", "DE-FR", "DE-LU", "DE-NL", "DE-NO", "DE-PL", "DE-SE", "DK-NL", "DK-NO", "DK-SE", "FR-LU",
-                   "NL-NO", "NO-SE", "PL-SE"]
-
-model_names = ["europower", "perseus", "mars", "powerflex", "ego", "miles", "isaar", "elmod"]
-model_names_plot = pd.Series(["Europower", "Perseus/Tango", "MarS/ZKNOT", "Powerflex-Grid-EU",
-                              "eGo/eTraGo", "MILES", "ISAaR", "ELMOD"], index=model_names)
-
-carriers_reduced = ['Nuclear', 'Lignite', 'Hard Coal', 'Natural Gas', 'Hydro', 'Wind', 'Solar', 'Bioenergy', 'Oil',
-                    'Other']
-carriers_all = ['Nuclear', 'Lignite', 'Hard Coal', 'Natural Gas', 'Run of River', 'Reservoir', 'Pumped Hydro Storage',
-                'Wind Onshore', 'Wind Offshore', 'Solar', 'Bioenergy', 'Oil', 'Geothermal', 'Waste',
-                'Other Conventional', 'Other Renewable']
+model_names = config.model_names['model_names']
 
 quantities_time = [
                    "vres_curtailments",    # Dataframes, time/regions
@@ -107,22 +86,22 @@ metrics = {'wasserstein': wasserstein,
            'correlation': corr}
 
 
-def zeros_df_t(year, index_name, level="market", columns=None, quantity=None):
+def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None):
     # return zeros dataframe
     if index_name == "snapshots":
         index = pd.date_range(str(year) + "-01-01", str(year + 1) + "-01-01", freq='h')[:-1]
     elif index_name == "carrier":
-        index = carriers_all
+        index = config.carriers_all
     else:
         raise ValueError("index_name can only be either snapshots or carrier")
     if columns is None:
         if quantity == "import_export":
-            columns = eu_neighs_conns
+            columns = config.eu_neighs_conns
         else:
             if level == "market":
-                columns = eu_neighs_ISO2 + ["DE"]
+                columns = config.eu_neighs_ISO2['eu_neighs_ISO2']
             elif level == "grid":
-                columns = de_nuts1
+                columns = config.de_nuts1['de_nuts1']
     df = pd.DataFrame(np.zeros((len(index), len(columns))), index=index, columns=columns)
     df.index.name = index_name
     return df
@@ -151,14 +130,14 @@ class Calculator:
                         else:
                             raise ValueError(quantity + " not in [" + ", ".join(quantities) + "]")
 
-                        df_0 = zeros_df_t(self.year, index_name, self.level, quantity=quantity)
+                        df_0 = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
                         try:
                             df = pd.read_csv(data_path, index_col=index_name, parse_dates=True).fillna(0.)
                             self.warning_flags.at[model, quantity] = "Ok."
                         except FileNotFoundError:
                             logger.error(quantity + " for model " + model + " was not found. Returning zeros.")
                             self.warning_flags.at[model, quantity] = "Missing file. Zeros"
-                            df = zeros_df_t(self.year, index_name, self.level, quantity=quantity)
+                            df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
                         except ValueError:
                             df = pd.read_csv(data_path).fillna(0.)
                             df.rename(columns=dict(zip(df.columns, df.columns.str.strip())), inplace=True)
@@ -181,7 +160,7 @@ class Calculator:
                                     quantity + " " + index_name + " were not found in the file for model " + model +
                                     " and cannot select from remaining columns. Returning zeros.")
                                 self.warning_flags.at[model, quantity] = "Missing index. Zeros"
-                                df = zeros_df_t(self.year, index_name, self.level, quantity=quantity)
+                                df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
                             else:
                                 df = pd.read_csv(data_path, index_col=new_index_col, parse_dates=True).fillna(0.)
                                 df.index.name = index_name
@@ -203,7 +182,7 @@ class Calculator:
                         missing_cols = df_0.columns.difference(df.columns)
                         existing_cols = df_0.columns.intersection(df.columns)
                         df = pd.concat([df[existing_cols].reindex(df_0.index),
-                                        zeros_df_t(self.year, index_name, columns=missing_cols)],
+                                        _zeros_df_t(self.year, index_name, columns=missing_cols)],
                                        axis=1)
 
                         getattr(self, '_' + quantity).update({model: df.fillna(0)})
@@ -269,7 +248,7 @@ class Calculator:
 
         self.entsoe_mix = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "data",
                                                    "entso-e-energy-mix-modex.csv"),
-                                      index_col='carrier').reindex(carriers_all)
+                                      index_col='carrier').reindex(config.carriers_all)
         self.entsoe_factsheets_net_balance = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "data",
                                                                       "entsoe_factsheets-net-balance-2016.csv"),
                                                          index_col='name')['imp-exp']
@@ -370,10 +349,10 @@ class Calculator:
             labels.append("ENTSO-E")
 
         if aggregate:
-            agg_dict = plots.aggregate_carriers.copy()
+            agg_dict = config.aggregate_carriers.copy()
             #agg_dict.update({'Wind': 'Wind', 'Hydro': 'Hydro', 'Other': 'Other'})
             dfs = [df.groupby(agg_dict, axis=1).sum() for df in dfs]
-            dfs = [df[sorted(df.columns, key=lambda s:  [i for i, x in enumerate(carriers_reduced) if x == s])]
+            dfs = [df[sorted(df.columns, key=lambda s:  [i for i, x in enumerate(config.carriers_reduced) if x == s])]
                    for df in dfs]  # sort carriers
 
         if relative:
