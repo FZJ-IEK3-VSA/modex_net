@@ -222,7 +222,7 @@ class Calculator:
 
     energy_mix = _quantity_get_set("energy_mix")
 
-    def __init__(self, year, level, scenario, data_source="csv"):
+    def __init__(self, year, level, scenario, data_source="csv", csv_path=None):
 
         logging.basicConfig(level=logging.INFO)
         logger.info("All methods assume hourly profiles.")
@@ -238,10 +238,14 @@ class Calculator:
             raise ValueError("data_source can only be either csv or oep")
         self.data_source = data_source
 
+        if not csv_path:
+            csv_path = os.path.join(os.path.dirname(__file__), "..", "data")
+        if not os.path.isdir(csv_path):
+            raise FileNotFoundError("directory "+csv_path+" was not found")
+
         self.data_path = ""
         if self.data_source == "csv":
-            self.data_path = os.path.join(os.path.dirname(__file__), "..", "data", str(self.year), self.level,
-                                          str(self.scenario))
+            self.data_path = os.path.join(csv_path, str(self.year), self.level, str(self.scenario))
             if not os.path.isdir(self.data_path):
                 raise FileNotFoundError("scenario folder "+self.scenario+" was not found")
 
@@ -250,13 +254,12 @@ class Calculator:
 
         self.warning_flags = pd.DataFrame(index=model_names, columns=quantities).fillna("Unknown.")
 
-        self.entsoe_mix = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "data",
-                                                   "entso-e-energy-mix-modex.csv"),
+        self.entsoe_mix = pd.read_csv(os.path.join(csv_path, "entso-e-energy-mix-modex.csv"),
                                       index_col='carrier').reindex(config.carriers_all)
-        self.entsoe_factsheets_net_balance = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "data",
+        self.entsoe_factsheets_net_balance = pd.read_csv(os.path.join(csv_path,
                                                                       "entsoe_factsheets-net-balance-2016.csv"),
                                                          index_col='name')['imp-exp']
-        self.entsoe_factsheets_net_exchanges = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "data",
+        self.entsoe_factsheets_net_exchanges = pd.read_csv(os.path.join(csv_path,
                                                                         "entsoe_factsheets-net-exchanges-2016.csv"),
                                                            index_col='name')['exchange']
 
