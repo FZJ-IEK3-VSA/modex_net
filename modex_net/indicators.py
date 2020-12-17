@@ -111,7 +111,25 @@ def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None):
     return df
 
 
-class Calculator:
+class Calculator(object):
+
+    """
+    Toolset for a given scenario.
+
+    Args:
+        year (int): Year of the scenario.
+        level (string): Level of the scenario. Can only be either "market" or "grid".
+        scenario (string): Name of the scenario.
+        data_source (string, default "csv"):
+            Type of data source. Can only be either "csv" or "oep" for .csv and Open Energy Platform respectively.
+        csv_path (string): Root path of the csv file structure.
+
+    Example:
+        >>> base = Calculator(2016, "market", "base")
+    """
+
+    def __repr__(self):
+        return "%s %s %s %s" % ("Scenario", self.year, self.level, self.scenario)
 
     def _quantity_get_set(quantity):
 
@@ -227,8 +245,6 @@ class Calculator:
         logging.basicConfig(level=logging.INFO)
         logger.info("All methods assume hourly profiles.")
 
-        if year not in [2016, 2030]:
-            raise ValueError("year can only be either 2016 or 2030")
         self.year = year
         if level not in ["market", "grid"]:
             raise ValueError("level can only be either market or grid")
