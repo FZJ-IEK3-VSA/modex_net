@@ -362,7 +362,7 @@ class Calculator(object):
                                     index=model_names)
                           for m1 in model_names], axis=1).rename(columns=dict(enumerate(model_names)))
 
-    def plot_energy_mix(self, relative=False, aggregate=False, entsoe=True, title=None, ylabel=None, ylim=None, **kwargs):
+    def plot_energy_mix(self, relative=False, aggregate=False, entsoe=True, title=None, ylabel="TWh", ylim=None, **kwargs):
 
         labels = list(self.energy_mix.keys())
         dfs = [self.energy_mix[m].T.replace(',', '.', regex=True).astype(float) for m in labels]
