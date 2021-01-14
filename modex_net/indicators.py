@@ -102,10 +102,9 @@ def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None):
         if quantity == "import_export":
             columns = config.eu_neighs_conns
         else:
-            if level == "market":
-                columns = config.eu_neighs_ISO2['eu_neighs_ISO2']
-            elif level == "grid":
-                columns = config.de_nuts1['de_nuts1']
+            columns = config.eu_neighs_ISO2['eu_neighs_ISO2']
+            if level == "grid" and quantity != "energy_mix":
+                columns = config.de_nuts1['de_nuts1_full_name']
     df = pd.DataFrame(np.zeros((len(index), len(columns))), index=index, columns=columns)
     df.index.name = index_name
     return df
@@ -160,37 +159,10 @@ class Calculator(object):
                             logger.error(quantity + " for model " + model + " was not found. Returning zeros.")
                             self.warning_flags.at[model, quantity] = "Missing file. Zeros"
                             df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
-                        except ValueError:
-                            df = pd.read_csv(data_path).fillna(0.)
-                            df.rename(columns=dict(zip(df.columns, df.columns.str.strip())), inplace=True)
-                            df.to_csv(data_path, index=False)  # fix for future parses
-                            if index_name not in df.columns:
-                                df_columns = df.rename(columns=dict(zip(df.columns, df.columns.str.upper()))).columns
-                                diff_cols = df_columns.difference(df_0.columns)
-                                if len(diff_cols) == 1:
-                                    new_index_col = df.columns[df_columns == diff_cols[0]][0]
-                                    logger.warning(
-                                        quantity + " " + index_name + " was not found in the file for model " + model
-                                        + ". Attempting to use " + str(new_index_col) + " as index.")
-                                else:
-                                    new_index_col = 0
-                            else:
-                                new_index_col = index_name
-
-                            if new_index_col == 0:
-                                logger.error(
-                                    quantity + " " + index_name + " were not found in the file for model " + model +
-                                    " and cannot select from remaining columns. Returning zeros.")
-                                self.warning_flags.at[model, quantity] = "Missing index. Zeros"
-                                df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
-                            else:
-                                df = pd.read_csv(data_path, index_col=new_index_col, parse_dates=True).fillna(0.)
-                                df.index.name = index_name
-                                df.to_csv(data_path)  # fix for future parses
-                                self.warning_flags.at[model, quantity] = "Ok."
-
-                        # make sure columns are in capital letters
-                        df.rename(columns=dict(zip(df.columns, df.columns.str.upper())), inplace=True)
+                        except:
+                            logger.error("Reading" + quantity + " for model " + model + " failed. Returning zeros.")
+                            self.warning_flags.at[model, quantity] = "Missing file. Zeros"
+                            df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
 
                         # fit dataframe to desired format
                         if not df_0.index.difference(df.index).empty:
@@ -364,7 +336,7 @@ class Calculator(object):
 
     def plot_energy_mix(self, relative=False, aggregate=False, entsoe=True, title=None, ylabel="TWh", ylim=None, **kwargs):
 
-        labels = list(self.energy_mix.keys())
+        labels = [m for m in self.energy_mix.keys() if self.energy_mix[m].sum().sum()]
         dfs = [self.energy_mix[m].T.replace(',', '.', regex=True).astype(float) for m in labels]
 
         if entsoe and self.year == 2016:
@@ -373,7 +345,6 @@ class Calculator(object):
 
         if aggregate:
             agg_dict = config.aggregate_carriers.copy()
-            #agg_dict.update({'Wind': 'Wind', 'Hydro': 'Hydro', 'Other': 'Other'})
             dfs = [df.groupby(agg_dict, axis=1).sum() for df in dfs]
             dfs = [df[sorted(df.columns, key=lambda s:  [i for i, x in enumerate(config.carriers_reduced) if x == s])]
                    for df in dfs]  # sort carriers
