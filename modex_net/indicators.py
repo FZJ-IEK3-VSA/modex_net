@@ -14,7 +14,7 @@ from . import plots, config
 import logging
 logger = logging.getLogger(__name__)
 
-model_names = config.model_names['model_names']
+model_names = config.model_names['model_names'].to_list()
 
 quantities_time = [
                    "vres_curtailments",    # Dataframes, time/regions
@@ -250,6 +250,11 @@ class Calculator(object):
         self.entsoe_factsheets_net_exchanges = pd.read_csv(os.path.join(csv_path,
                                                                         "entsoe_factsheets-net-exchanges-2016.csv"),
                                                            index_col='name')['exchange']
+        self.entsoe_day_ahead_prices = pd.read_csv(os.path.join(csv_path, "entsoe_day_ahead_prices_2016.csv"),
+                                                   index_col='snapshots')
+        # add zeros to missing countries
+        for missing_col in ['NO', 'DK', 'SE']:
+            self.entsoe_day_ahead_prices[missing_col] = 0.
 
     def sum(self, quantity):
 
@@ -379,6 +384,42 @@ class Calculator(object):
 
         return plots.plot_heatmap(df, quantity=quantity, metric=metric, title=title, **kwargs)
 
+    def price_convergence(self):
+
+        from itertools import combinations
+        import functools
+        import operator
+
+        region_countries = pd.Series([['DE', 'NL', 'BE', 'FR'],
+                                      ['DE', 'PL', 'CZ', 'AT'],
+                                      ['DK', 'NO', 'SE'],
+                                      config.eu_neighs_ISO2['eu_neighs_ISO2'].to_list()],
+                                     index=['CWE', '"CEE"', 'Nordic', 'All'])
+        regional_convergence = pd.DataFrame(index=model_names + ['ENTSOE'], columns=region_countries.index)
+        for model_name in model_names:
+            for region in regional_convergence.columns:
+
+                df = getattr(self, 'electricity_prices')[model_name]
+                pairs = [((df[pair[0]] - df[pair[1]]).abs() < 0.01) for pair in
+                         combinations(region_countries[region], 2)]
+                regional_convergence.loc[model_name, region] = functools.reduce(operator.and_, pairs).sum() / 87.6
+
+                df = self.entsoe_day_ahead_prices
+                pairs = [((df[pair[0]] - df[pair[1]]).abs() < 0.01) for pair in
+                         combinations(region_countries[region], 2)]
+                regional_convergence.loc['ENTSOE', region] = functools.reduce(operator.and_, pairs).sum() / 87.6
+
+        interconn_convergence = pd.DataFrame(index=config.eu_neighs_conns, columns=model_names)
+        for model_name in interconn_convergence.columns:
+            df = getattr(self, 'electricity_prices')[model_name]
+            for conn in interconn_convergence.index:
+                interconn_convergence.loc[conn, model_name] = (df[conn[:2]] - df[conn[-2:]]).abs().mean()
+            df = self.entsoe_day_ahead_prices
+            for conn in interconn_convergence.index:
+                interconn_convergence.loc[conn, 'ENTSOE'] = (df[conn[:2]] - df[conn[-2:]]).abs().mean()
+
+        return {'regional convergence': regional_convergence,
+                'interconnection convergence': interconn_convergence}
 
 
 
