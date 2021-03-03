@@ -5,6 +5,7 @@
 
 import pandas as pd
 import numpy as np
+import math
 
 import matplotlib
 from matplotlib import pyplot as plt
@@ -66,6 +67,23 @@ def plot_dendrogram(data, color_threshold=0.7, title=None, figsize=(8,6), linewi
 
     plt.tight_layout()
 
+    if savefig: plt.savefig(savefig, dpi=dpi)
+
+    return ax
+
+
+def plot_df(df, title=None, ylabel=None, legend=True, figsize=(8,6), linewidth=config.linewidth,
+            fontsize=config.fontsize, savefig=None, dpi=300, **kwargs):
+
+    # plotting
+    fig, ax = plt.subplots(figsize=figsize)
+    ax = df.plot(ax=ax, legend=legend, linewidth=linewidth, fontsize=fontsize, **kwargs)
+    ax.set_title(title, fontsize=fontsize+4)
+    ax.set_ylabel(ylabel, fontsize=fontsize+2)
+    ax.set_xlabel('Time', fontsize=fontsize)
+    if legend: ax.legend(loc='best', fancybox=True, framealpha=0.5, fontsize=fontsize)
+
+    plt.tight_layout()
     if savefig: plt.savefig(savefig, dpi=dpi)
 
     return ax
@@ -152,7 +170,7 @@ def plot_clustered_stacked(dfall, labels=None, figsize=(16,9), title=None, ylabe
     return axe
 
 
-def plot_heatmap(df, quantity, metric=None, title=None, figsize=(12,8), fontsize=config.fontsize, savefig=None, dpi=300,
+def plot_heatmap(df, quantity, metric=None, title=None, figsize=(9,16), fontsize=config.fontsize, savefig=None, dpi=300,
                  **kwargs):
 
     fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -169,9 +187,11 @@ def plot_heatmap(df, quantity, metric=None, title=None, figsize=(12,8), fontsize
         if metric == 'correlation':
             cmap = "RdYlGn"
         percent = False
+        order_of_magnitude = math.floor(math.log10(df.max().max()))
+        df = df / 10 ** order_of_magnitude
         vmin = df.min().min()
         vmax = df.max().max()
-        cbarlabel = "Distance"
+        cbarlabel = "Distance (x10$^"+str(order_of_magnitude)+"$)"
         if vmax < 1.:
             valfmt = "{x:.2f}"
 

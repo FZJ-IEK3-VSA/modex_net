@@ -263,6 +263,13 @@ class Calculator(object):
         return (pd.concat([getattr(self, quantity)[model].sum() for model in model_names], axis=1)
                 .rename(columns=dict(enumerate(model_names))))
 
+    def mean(self, quantity):
+
+        assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
+
+        return (pd.concat([getattr(self, quantity)[model].mean() for model in model_names], axis=1)
+                .rename(columns=dict(enumerate(model_names))))
+
     def normalized_std(self, quantity):
 
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
@@ -290,8 +297,8 @@ class Calculator(object):
 
     def plot_dendrogram(self, quantity, func, percent=None, **kwargs):
 
-        one_arg_funcs = ['sum', 'normalized_std']
-        two_arg_funcs = ["percentile", "percentile"]
+        one_arg_funcs = ['sum', 'mean', 'normalized_std']
+        two_arg_funcs = ["percentile", "percentile_converter"]
         all_funcs = one_arg_funcs + two_arg_funcs
 
         assert func in all_funcs, "Valid functions can only be one of [" + ", ".join(all_funcs) + "]"
