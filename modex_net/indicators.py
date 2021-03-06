@@ -137,18 +137,19 @@ class Calculator(object):
                 if getattr(self, '_'+quantity)[model].empty:
                     logger.info(quantity + " data for " + model+" is empty. Loading from " + self.data_source)
 
+                    if quantity in quantities_time:
+                        index_name = "snapshots"
+                    elif quantity in quantities_categorical:
+                        index_name = "carrier"
+                    else:
+                        raise ValueError(quantity + " not in [" + ", ".join(quantities) + "]")
+
+                    df_0 = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
+
                     if self.data_source == "csv":
 
                         data_path = os.path.join(self.csv_path, model, quantity + ".csv")
 
-                        if quantity in quantities_time:
-                            index_name = "snapshots"
-                        elif quantity in quantities_categorical:
-                            index_name = "carrier"
-                        else:
-                            raise ValueError(quantity + " not in [" + ", ".join(quantities) + "]")
-
-                        df_0 = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
                         try:
                             df = pd.read_csv(data_path, index_col=index_name, parse_dates=True).fillna(0.)
                             self.warning_flags.at[model, quantity] = "Ok."
@@ -161,28 +162,41 @@ class Calculator(object):
                             self.warning_flags.at[model, quantity] = "Missing file. Zeros"
                             df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
 
-                        # fit dataframe to desired format
-                        if not df_0.index.difference(df.index).empty:
-                            logger.warning("Missing " + index_name + " for " + quantity + " in model " + model +
-                                           ". Filling with zeros.")
-                            self.warning_flags.at[model, quantity] = "Partly broken."
-                        if not df_0.columns.difference(df.columns).empty:
-                            logger.warning("Missing columns for " + quantity + " in model " + model +
-                                           ". Filling with zeros.")
-                            self.warning_flags.at[model, quantity] = "Partly broken."
-                        missing_cols = df_0.columns.difference(df.columns)
-                        existing_cols = df_0.columns.intersection(df.columns)
-                        df = pd.concat([df[existing_cols].reindex(df_0.index),
-                                        _zeros_df_t(self.year, index_name, columns=missing_cols)],
-                                       axis=1)
-
-                        getattr(self, '_' + quantity).update({model: df.fillna(0)})
-
                     elif self.data_source == "oep":
-                        pass
+                        table_name = f'{model}_{self.year}_{self.level}_{self.scenario}_{quantity}'
+                        try:
+                            data = self.cli.select_table(table_name)
+                            df = pd.DataFrame.from_records(data)
+                            if 'snapshots' in df.columns:
+                                df['snapshots'] = pd.to_datetime(df['snapshots'])
+                            if 'id' in df.columns:
+                                df.drop('id', axis=1, inplace=True)
+                            df = df.set_index('snapshots')
+                            self.warning_flags.at[model, quantity] = "Ok."
+                        except:
+                            logger.error("Table" + table_name + " was not found. Returning zeros.")
+                            self.warning_flags.at[model, quantity] = "Missing table. Zeros"
+                            df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
 
                     else:
                         raise NotImplementedError
+
+                    # fit dataframe to desired format
+                    if not df_0.index.difference(df.index).empty:
+                        logger.warning("Missing " + index_name + " for " + quantity + " in model " + model +
+                                       ". Filling with zeros.")
+                        self.warning_flags.at[model, quantity] = "Partly broken."
+                    if not df_0.columns.difference(df.columns).empty:
+                        logger.warning("Missing columns for " + quantity + " in model " + model +
+                                       ". Filling with zeros.")
+                        self.warning_flags.at[model, quantity] = "Partly broken."
+                    missing_cols = df_0.columns.difference(df.columns)
+                    existing_cols = df_0.columns.intersection(df.columns)
+                    df = pd.concat([df[existing_cols].reindex(df_0.index),
+                                    _zeros_df_t(self.year, index_name, columns=missing_cols)],
+                                   axis=1)
+
+                    getattr(self, '_' + quantity).update({model: df.fillna(0)})
 
             return getattr(self, '_'+quantity)
 
@@ -256,13 +270,13 @@ class Calculator(object):
 
         self.oep_token = oep_token
         self.oep_host = oep_host
+        self.cli = oepcli.OEPClient(token=self.oep_token, host=self.oep_host)
 
     def upload_experiment(self, model_name):
-        cli = oepcli.OEPClient(token=self.oep_token, host=self.oep_host)
         for quantity in quantities:
             table_name = f'{model_name}_{self.year}_{self.level}_{self.scenario}_{quantity}'
             try:
-                cli.create_table(table_name, getattr(table_definitions, quantity)[self.level])
+                self.cli.create_table(table_name, getattr(table_definitions, quantity)[self.level])
             except:
                 logging.info("table already exists")
 
@@ -271,18 +285,17 @@ class Calculator(object):
                 df['snapshots'] = df['snapshots'].astype(str)
 
             try:
-                cli.insert_table(table_name, df.to_dict(orient='records'))
+                self.cli.insert_table(table_name, df.to_dict(orient='records'))
             except:
                 logging.info("Table is not empty. Deleting it and re-uploading it")
-                cli.drop_table(table_name)
-                cli.create_table(table_name, getattr(table_definitions, quantity)[self.level])
-                cli.insert_table(table_name, df.to_dict(orient='records'))
+                self.cli.drop_table(table_name)
+                self.cli.create_table(table_name, getattr(table_definitions, quantity)[self.level])
+                self.cli.insert_table(table_name, df.to_dict(orient='records'))
 
     def delete_experiment(self, model_name):
-        cli = oepcli.OEPClient(token=self.oep_token, host=self.oep_host)
         for quantity in quantities:
             table_name = f'{model_name}_{self.year}_{self.level}_{self.scenario}_{quantity}'
-            cli.drop_table(table_name)
+            self.cli.drop_table(table_name)
 
     def sum(self, quantity):
 
