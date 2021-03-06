@@ -9,7 +9,7 @@ import numpy as np
 import calendar
 from scipy.stats import wasserstein_distance, gaussian_kde
 
-from . import plots, config
+from . import plots, config, table_definitions, oepcli
 
 import logging
 logger = logging.getLogger(__name__)
@@ -139,7 +139,7 @@ class Calculator(object):
 
                     if self.data_source == "csv":
 
-                        data_path = os.path.join(self.data_path, model, quantity + ".csv")
+                        data_path = os.path.join(self.csv_path, model, quantity + ".csv")
 
                         if quantity in quantities_time:
                             index_name = "snapshots"
@@ -209,7 +209,8 @@ class Calculator(object):
 
     energy_mix = _quantity_get_set("energy_mix")
 
-    def __init__(self, year, level, scenario, data_source="csv", csv_path=None):
+    def __init__(self, year, level, scenario, data_source="csv", data_path=None,
+                 oep_token="", oep_host="its10098.its.kfa-juelich.de"):
 
         logging.basicConfig(level=logging.INFO)
         logger.info("All methods assume hourly profiles.")
@@ -223,15 +224,15 @@ class Calculator(object):
             raise ValueError("data_source can only be either csv or oep")
         self.data_source = data_source
 
-        if not csv_path:
-            csv_path = os.path.join(os.path.dirname(__file__), "..", "data")
-        if not os.path.isdir(csv_path):
-            raise FileNotFoundError("directory "+csv_path+" was not found")
+        if not data_path:
+            data_path = os.path.join(os.path.dirname(__file__), "..", "data")
+        if not os.path.isdir(data_path):
+            raise FileNotFoundError("directory "+data_path+" was not found")
 
-        self.data_path = ""
+        self.csv_path = ""
         if self.data_source == "csv":
-            self.data_path = os.path.join(csv_path, str(self.year), self.level, str(self.scenario))
-            if not os.path.isdir(self.data_path):
+            self.csv_path = os.path.join(data_path, str(self.year), self.level, str(self.scenario))
+            if not os.path.isdir(self.csv_path):
                 raise FileNotFoundError("scenario folder "+self.scenario+" was not found")
 
         for quantity in quantities:
@@ -239,19 +240,49 @@ class Calculator(object):
 
         self.warning_flags = pd.DataFrame(index=model_names, columns=quantities).fillna("Unknown.")
 
-        self.entsoe_mix = pd.read_csv(os.path.join(csv_path, "entso-e-energy-mix-modex.csv"),
+        self.entsoe_mix = pd.read_csv(os.path.join(data_path, "entso-e-energy-mix-modex.csv"),
                                       index_col='carrier').reindex(config.carriers_all)
-        self.entsoe_factsheets_net_balance = pd.read_csv(os.path.join(csv_path,
+        self.entsoe_factsheets_net_balance = pd.read_csv(os.path.join(data_path,
                                                                       "entsoe_factsheets-net-balance-2016.csv"),
                                                          index_col='name')['imp-exp']
-        self.entsoe_factsheets_net_exchanges = pd.read_csv(os.path.join(csv_path,
+        self.entsoe_factsheets_net_exchanges = pd.read_csv(os.path.join(data_path,
                                                                         "entsoe_factsheets-net-exchanges-2016.csv"),
                                                            index_col='name')['exchange']
-        self.entsoe_day_ahead_prices = pd.read_csv(os.path.join(csv_path, "entsoe_day_ahead_prices_2016.csv"),
+        self.entsoe_day_ahead_prices = pd.read_csv(os.path.join(data_path, "entsoe_day_ahead_prices_2016.csv"),
                                                    index_col='snapshots')
         # add zeros to missing countries
         for missing_col in ['NO', 'DK', 'SE']:
             self.entsoe_day_ahead_prices[missing_col] = 0.
+
+        self.oep_token = oep_token
+        self.oep_host = oep_host
+
+    def upload_experiment(self, model_name):
+        cli = oepcli.OEPClient(token=self.oep_token, host=self.oep_host)
+        for quantity in quantities:
+            table_name = f'{model_name}_{self.year}_{self.level}_{self.scenario}_{quantity}'
+            try:
+                cli.create_table(table_name, getattr(table_definitions, quantity)[self.level])
+            except:
+                logging.info("table already exists")
+
+            df = getattr(self, quantity)[model_name].reset_index().rename_axis('id').reset_index()
+            if 'snapshots' in df.columns:
+                df['snapshots'] = df['snapshots'].astype(str)
+
+            try:
+                cli.insert_table(table_name, df.to_dict(orient='records'))
+            except:
+                logging.info("Table is not empty. Deleting it and re-uploading it")
+                cli.drop_table(table_name)
+                cli.create_table(table_name, getattr(table_definitions, quantity)[self.level])
+                cli.insert_table(table_name, df.to_dict(orient='records'))
+
+    def delete_experiment(self, model_name):
+        cli = oepcli.OEPClient(token=self.oep_token, host=self.oep_host)
+        for quantity in quantities:
+            table_name = f'{model_name}_{self.year}_{self.level}_{self.scenario}_{quantity}'
+            cli.drop_table(table_name)
 
     def sum(self, quantity):
 
