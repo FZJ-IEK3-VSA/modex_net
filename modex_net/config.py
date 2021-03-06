@@ -11,9 +11,9 @@ leap_years = False  # if false, the last day of leap years is dropped
 dir_name = os.path.dirname(__file__)
 de_nuts1 = pd.read_csv(os.path.join(dir_name, "config_files", "de_nuts1.csv"), encoding='ISO-8859-1')
 eu_neighs_ISO2 = pd.read_csv(os.path.join(dir_name, "config_files", "eu_neighs.csv"))
-eu_neighs_conns = ["AT-CH", "AT-CZ", "AT-DE", "BE-DE", "BE-FR", "BE-LU", "BE-NL", "CH-DE", "CH-FR", "CZ-DE", "CZ-PL",
-                   "DE-DK", "DE-FR", "DE-LU", "DE-NL", "DE-NO", "DE-PL", "DE-SE", "DK-NL", "DK-NO", "DK-SE", "FR-LU",
-                   "NL-NO", "NO-SE", "PL-SE"]
+eu_neighs_conns = ["AT_CH", "AT_CZ", "AT_DE", "BE_DE", "BE_FR", "BE_LU", "BE_NL", "CH_DE", "CH_FR", "CZ_DE", "CZ_PL",
+                   "DE_DK", "DE_FR", "DE_LU", "DE_NL", "DE_NO", "DE_PL", "DE_SE", "DK_NL", "DK_NO", "DK_SE", "FR_LU",
+                   "NL_NO", "NO_SE", "PL_SE"]
 
 model_names = pd.read_csv(os.path.join(dir_name, "config_files", "model_names.csv"))
 

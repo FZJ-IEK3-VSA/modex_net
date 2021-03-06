@@ -18,7 +18,6 @@ model_names = config.model_names['model_names'].to_list()
 
 quantities_time = [
                    "vres_curtailments",    # Dataframes, time/regions
-                   "redispatch_vol",       # Dataframes, time/regions
                    "emissions",            # Dataframes, time/regions
                    "load_curtailments",    # Dataframes, time/regions
 
@@ -26,10 +25,8 @@ quantities_time = [
                    "storage_soc",          # Dataframes, time/regions
 
                    "import_export",        # Dataframes, time/interconnections
-                   "line_loadings",        # Dataframes, time/lines
 
-                   "electricity_prices",   # Dataframes, time/regions
-                   "redispatch_cost"       # Dataframes, time/regions
+                   "electricity_prices"   # Dataframes, time/regions
                   ]
 quantities_categorical = ["energy_mix"]    # Dataframes, carrier/regions
 quantities = quantities_time + quantities_categorical
