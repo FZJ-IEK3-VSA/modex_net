@@ -272,7 +272,7 @@ class Calculator(object):
         self.oep_host = oep_host
         self.cli = oepcli.OEPClient(token=self.oep_token, host=self.oep_host)
 
-    def upload_experiment(self, model_name):
+    def upload_experiment_oep(self, model_name):
         for quantity in quantities:
             table_name = f'{model_name}_{self.year}_{self.level}_{self.scenario}_{quantity}'
             try:
@@ -292,7 +292,7 @@ class Calculator(object):
                 self.cli.create_table(table_name, getattr(table_definitions, quantity)[self.level])
                 self.cli.insert_table(table_name, df.to_dict(orient='records'))
 
-    def delete_experiment(self, model_name):
+    def delete_experiment_oep(self, model_name):
         for quantity in quantities:
             table_name = f'{model_name}_{self.year}_{self.level}_{self.scenario}_{quantity}'
             self.cli.drop_table(table_name)
