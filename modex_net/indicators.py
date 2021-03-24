@@ -351,18 +351,24 @@ class Calculator(object):
                 logger.warning("This function does not  accept a second argument. It is ignored.")
         return plots.plot_dendrogram(getattr(self, func)(quantity).transpose(), **kwargs)
 
+    def pair_distance_single(self, quantity, metric, model):
+
+        assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
+        assert metric in metrics.keys(), "Valid metrics can only be one of [" + ", ".join(metrics.keys()) + "]"
+
+        return (pd.concat([(getattr(self, quantity)[model]
+                            .combine(getattr(self, quantity)[mod], metrics[metric])
+                            .iloc[0]
+                            .rename(None))
+                           for mod in model_names], axis=1)
+                .rename(columns=dict(enumerate(model_names))))
+
     def pair_distance(self, quantity, metric):
 
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
         assert metric in metrics.keys(), "Valid metrics can only be one of [" + ", ".join(metrics.keys()) + "]"
 
-        return {model: (pd.concat([(getattr(self, quantity)[model]
-                                    .combine(getattr(self, quantity)[mod], metrics[metric])
-                                    .iloc[0]
-                                    .rename(None))
-                                   for mod in model_names], axis=1)
-                        .rename(columns=dict(enumerate(model_names))))
-                for model in model_names}
+        return {model: self.pair_distance_single(quantity, metric, model) for model in model_names}
 
     def line_overload_incidents(self, threshold=0.7):
         """
@@ -427,7 +433,7 @@ class Calculator(object):
         else:
             assert metric in metrics.keys(), "Valid metrics can only be one of [" + ", ".join(metrics.keys()) + "]"
             assert model in model_names, "Valid model names can only be one of [" + ", ".join(model_names) + "]"
-            df = self.pair_distance(quantity, metric)[model]
+            df = self.pair_distance_single(quantity, metric, model)
             title = model + " model"
 
         return plots.plot_heatmap(df, quantity=quantity, metric=metric, title=title, **kwargs)
