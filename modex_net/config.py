@@ -21,7 +21,7 @@ carriers_reduced = ['Nuclear', 'Lignite', 'Hard Coal', 'Natural Gas', 'Hydro', '
                     'Other']
 carriers_all = ['Nuclear', 'Lignite', 'Hard Coal', 'Natural Gas', 'Run of River', 'Reservoir', 'Pumped Hydro Storage',
                 'Wind Onshore', 'Wind Offshore', 'Solar', 'Bioenergy', 'Oil', 'Geothermal', 'Waste',
-                'Other Conventional', 'Other Renewable']
+                'Other Conventional', 'Other Renewable', 'Hydro', 'Wind']
 
 linewidth = 2.5
 fontsize = 16
