@@ -54,7 +54,10 @@ def bhattacharyya(a, b):
 
     pdf_a = gaussian_kde(a)
     pdf_b = gaussian_kde(b)
-    return -np.log(sum((np.sqrt(u * w) for u, w in zip(pdf_a(x)/sum(pdf_a(x)), pdf_b(x)/sum(pdf_b(x))))))
+    if sum(pdf_a(x)) and sum(pdf_b(x)):
+        return -np.log(sum((np.sqrt(u * w) for u, w in zip(pdf_a(x)/sum(pdf_a(x)), pdf_b(x)/sum(pdf_b(x))))))
+    else:
+        return -1
 
 
 def frechet(a, b):
