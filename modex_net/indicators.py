@@ -57,7 +57,7 @@ def bhattacharyya(a, b):
     if sum(pdf_a(x)) and sum(pdf_b(x)):
         return -np.log(sum((np.sqrt(u * w) for u, w in zip(pdf_a(x)/sum(pdf_a(x)), pdf_b(x)/sum(pdf_b(x))))))
     else:
-        return -1
+        return -0.01
 
 
 def frechet(a, b):
