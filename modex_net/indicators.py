@@ -170,7 +170,7 @@ class Calculator(object):
 
                     elif self.data_source == "oep":
                         try:
-                            data = self.cli[model].download_parameter(self.year, self.level, self.scenario, quantity)
+                            data = self.cli.download_parameter(self.year, self.level, self.scenario, quantity, model)
                             df = pd.DataFrame.from_records(data)
                             if quantity == "energy_mix":
                                 df = df.pivot_table(index='carrier', columns='country_code', values='value')
@@ -265,10 +265,9 @@ class Calculator(object):
         if data_source == "oep":
             self.oep_token = oep_token
             self.oep_user = oep_modex_user
-            self.cli = {model: ModexClient(token=self.oep_token, model_name=model, user=self.oep_user)
-                        for model in model_names}
+            self.cli = ModexClient(token=self.oep_token, user=self.oep_user)
             self._time_map = pd.to_datetime(
-                pd.DataFrame.from_records(self.cli['europower'].select_table("mn_dimension_time"))
+                pd.DataFrame.from_records(self.cli.select_table("mn_dimension_time"))
                 .set_index('hour')[f'timestamp_{self.year}'])
 
         for quantity in quantities:
