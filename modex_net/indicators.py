@@ -9,7 +9,9 @@ import numpy as np
 import calendar
 from scipy.stats import wasserstein_distance, gaussian_kde
 
-from . import plots, config, table_definitions, oepcli
+from . import plots, config
+from progressbar import ProgressBar
+from modex_net_oep import ModexClient
 
 import logging
 logger = logging.getLogger(__name__)
@@ -100,7 +102,7 @@ def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None):
         raise ValueError("index_name can only be either snapshots or carrier")
     if columns is None:
         if quantity == "import_export":
-            columns = config.eu_neighs_conns
+            columns = config.eu_neighs_conns[year]
         else:
             columns = config.eu_neighs_ISO2['eu_neighs_ISO2']
             if level == "grid" and quantity != "energy_mix":
@@ -135,7 +137,8 @@ class Calculator(object):
         @property
         def quantity_prop(self):
 
-            for model in model_names:
+            pbar = ProgressBar()
+            for model in pbar(model_names):
 
                 if getattr(self, '_'+quantity)[model].empty:
                     logger.info(quantity + " data for " + model+" is empty. Loading from " + self.data_source)
@@ -166,18 +169,26 @@ class Calculator(object):
                             df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
 
                     elif self.data_source == "oep":
-                        table_name = f'{model}_{self.year}_{self.level}_{self.scenario}_{quantity}'
                         try:
-                            data = self.cli.select_table(table_name)
+                            data = self.cli[model].download_parameter(self.year, self.level, self.scenario, quantity)
                             df = pd.DataFrame.from_records(data)
-                            if 'snapshots' in df.columns:
-                                df['snapshots'] = pd.to_datetime(df['snapshots'])
-                            if 'id' in df.columns:
-                                df.drop('id', axis=1, inplace=True)
-                            df = df.set_index('snapshots')
+                            if quantity == "energy_mix":
+                                df = df.pivot_table(index='carrier', columns='country_code', values='value')
+                            elif quantity == "import_export":
+                                df['from_to'] = df['country_code_from'] + '_' + df['country_code_to']
+                                from_to_sorted = df[['country_code_from', 'country_code_to']].apply(np.sort, axis=1)
+                                df['from_to_sorted'] = from_to_sorted.apply(
+                                    lambda x: x[0]) + '_' + from_to_sorted.apply(lambda x: x[1])
+                                inverse_flows = df.from_to_sorted != df.from_to
+                                df.loc[inverse_flows, 'value'] *= -1
+                                df = df.pivot_table(index='hour', columns='from_to_sorted', values='value')
+                                df.index = df.index.map(self._time_map)
+                            else:
+                                df = df.pivot_table(index='hour', columns='country_code', values='value')
+                                df.index = df.index.map(self._time_map)
                             self.warning_flags.at[model, quantity] = "Ok."
                         except:
-                            logger.error("Table" + table_name + " was not found. Returning zeros.")
+                            logger.error("Table for " + model + " could not be retrieved. Returning zeros.")
                             self.warning_flags.at[model, quantity] = "Missing table. Zeros"
                             df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
 
@@ -227,7 +238,7 @@ class Calculator(object):
     energy_mix = _quantity_get_set("energy_mix")
 
     def __init__(self, year, level, scenario, data_source="csv", data_path=None,
-                 oep_token="", oep_host="its10098.its.kfa-juelich.de"):
+                 oep_token="", oep_modex_user="c.syranidou@fz-juelich.de"):
 
         logging.basicConfig(level=logging.INFO)
         logger.info("All methods assume hourly profiles.")
@@ -241,22 +252,31 @@ class Calculator(object):
             raise ValueError("data_source can only be either csv or oep")
         self.data_source = data_source
 
-        if not data_path:
-            data_path = os.path.join(os.path.dirname(__file__), "..", "data")
-        if not os.path.isdir(data_path):
-            raise FileNotFoundError("directory "+data_path+" was not found")
-
-        self.csv_path = ""
         if self.data_source == "csv":
+            if not data_path:
+                data_path = os.path.join(os.path.dirname(__file__), "..", "data")
+            if not os.path.isdir(data_path):
+                raise FileNotFoundError("directory "+data_path+" was not found")
+
             self.csv_path = os.path.join(data_path, str(self.year), self.level, str(self.scenario))
             if not os.path.isdir(self.csv_path):
                 raise FileNotFoundError("scenario folder "+self.scenario+" was not found")
+
+        if data_source == "oep":
+            self.oep_token = oep_token
+            self.oep_user = oep_modex_user
+            self.cli = {model: ModexClient(token=self.oep_token, model_name=model, user=self.oep_user)
+                        for model in model_names}
+            self._time_map = pd.to_datetime(
+                pd.DataFrame.from_records(self.cli['europower'].select_table("mn_dimension_time"))
+                .set_index('hour')[f'timestamp_{self.year}'])
 
         for quantity in quantities:
             setattr(self, quantity, dict(zip(model_names, [pd.DataFrame()]*len(model_names))))
 
         self.warning_flags = pd.DataFrame(index=model_names, columns=quantities).fillna("Unknown.")
 
+        data_path = os.path.join(os.path.dirname(__file__), "..", "data")
         self.entsoe_mix = pd.read_csv(os.path.join(data_path, "entso-e-energy-mix-modex.csv"),
                                       index_col='carrier').reindex(config.carriers_all)
         self.entsoe_factsheets_net_balance = pd.read_csv(os.path.join(data_path,
@@ -270,35 +290,6 @@ class Calculator(object):
         # add zeros to missing countries
         for missing_col in ['NO', 'DK', 'SE']:
             self.entsoe_day_ahead_prices[missing_col] = 0.
-
-        self.oep_token = oep_token
-        self.oep_host = oep_host
-        self.cli = oepcli.OEPClient(token=self.oep_token, host=self.oep_host)
-
-    def upload_experiment_oep(self, model_name):
-        for quantity in quantities:
-            table_name = f'{model_name}_{self.year}_{self.level}_{self.scenario}_{quantity}'
-            try:
-                self.cli.create_table(table_name, getattr(table_definitions, quantity)[self.level])
-            except:
-                logging.info("table already exists")
-
-            df = getattr(self, quantity)[model_name].reset_index().rename_axis('id').reset_index()
-            if 'snapshots' in df.columns:
-                df['snapshots'] = df['snapshots'].astype(str)
-
-            try:
-                self.cli.insert_table(table_name, df.to_dict(orient='records'))
-            except:
-                logging.info("Table is not empty. Deleting it and re-uploading it")
-                self.cli.drop_table(table_name)
-                self.cli.create_table(table_name, getattr(table_definitions, quantity)[self.level])
-                self.cli.insert_table(table_name, df.to_dict(orient='records'))
-
-    def delete_experiment_oep(self, model_name):
-        for quantity in quantities:
-            table_name = f'{model_name}_{self.year}_{self.level}_{self.scenario}_{quantity}'
-            self.cli.drop_table(table_name)
 
     def sum(self, quantity):
 
