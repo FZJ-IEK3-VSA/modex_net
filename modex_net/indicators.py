@@ -89,24 +89,36 @@ metrics = {'wasserstein': wasserstein,
            'correlation': corr}
 
 
-def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None):
-    # return zeros dataframe
+def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None, data_source="csv", **kwargs):
+    """Returns the appropriate dataframe template filled with zeros."""
+
+    if data_source == "oep":
+        cli = ModexClient(**kwargs)
     if index_name == "snapshots":
         drop_hours = 1
         if calendar.isleap(year) and not config.leap_years:
             drop_hours = 25
         index = pd.date_range(str(year) + "-01-01", str(year + 1) + "-01-01", freq='h')[:-drop_hours]
     elif index_name == "carrier":
-        index = config.carriers_all
+        if data_source == "csv":
+            index = config.carriers_all
+        elif data_source == "oep":
+            index = pd.DataFrame.from_records(cli.select_table("mn_dimension_carrier"))['carrier'].tolist()
     else:
         raise ValueError("index_name can only be either snapshots or carrier")
     if columns is None:
         if quantity == "import_export":
             columns = config.eu_neighs_conns[year]
         else:
-            columns = config.eu_neighs_ISO2['eu_neighs_ISO2']
+            if data_source == "csv":
+                columns = config.eu_neighs_ISO2['eu_neighs_ISO2']
+            elif data_source == "oep":
+                columns = pd.DataFrame.from_records(cli.select_table("mn_dimension_country"))['country_code'].tolist()
             if level == "grid" and quantity != "energy_mix":
-                columns = config.de_nuts1['de_nuts1_full_name']
+                if data_source == "csv":
+                    columns = config.de_nuts1['de_nuts1_full_name']
+                elif data_source == "oep":
+                    columns = pd.DataFrame.from_records(cli.select_table("mn_dimension_region"))['region_code'].tolist()
     df = pd.DataFrame(np.zeros((len(index), len(columns))), index=index, columns=columns)
     df.index.name = index_name
     return df
@@ -186,6 +198,7 @@ class Calculator(object):
                             else:
                                 df = df.pivot_table(index='hour', columns='country_code', values='value')
                                 df.index = df.index.map(self._time_map)
+                            df.index.name = index_name
                             self.warning_flags.at[model, quantity] = "Ok."
                         except:
                             logger.error("Table for " + model + " could not be retrieved. Returning zeros.")
@@ -193,7 +206,7 @@ class Calculator(object):
                             df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
 
                     else:
-                        raise NotImplementedError
+                        raise NotImplementedError("Available data sources: csv, oep")
 
                     # fit dataframe to desired format
                     if not df_0.index.difference(df.index).empty:
