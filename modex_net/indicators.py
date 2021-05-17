@@ -62,8 +62,22 @@ def bhattacharyya(a, b):
         return -0.01
 
 
-def frechet(a, b):
+def max_diff(a, b):
     return (a - b).abs().max()
+
+
+def mape(a, b):
+    from sklearn.metrics import mean_absolute_percentage_error
+    return mean_absolute_percentage_error(a, b)
+
+
+def euclidean(a, b):
+    return np.linalg.norm(a - b)
+
+
+def frechet(a, b):
+    import frechetdist
+    return frechetdist.frdist([range(len(a)), a], [range(len(b)), b])
 
 
 def dtw(a, b):
@@ -84,6 +98,9 @@ def corr(a, b):
 
 metrics = {'wasserstein': wasserstein,
            'bhattacharyya': bhattacharyya,
+           'max_diff': max_diff,
+           'mape': mape,
+           'euclidean': euclidean,
            'frechet': frechet,
            'dtw': dtw,
            'correlation': corr}
