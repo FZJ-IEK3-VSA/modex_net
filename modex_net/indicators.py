@@ -265,6 +265,11 @@ class Calculator(object):
             raise ValueError("data_source can only be either csv or oep")
         self.data_source = data_source
 
+        if level == "market":
+            self.regions = config.eu_neighs_ISO2['eu_neighs_ISO2'].to_list()
+        else:
+            self.regions = config.de_nuts1['de_nuts1_full_name'].to_list()
+
         if self.data_source == "csv":
             if not data_path:
                 data_path = os.path.join(os.path.dirname(__file__), "..", "data")
@@ -480,6 +485,31 @@ class Calculator(object):
 
         return {'regional convergence': regional_convergence,
                 'interconnection convergence': interconn_convergence}
+
+    def plot_taylor_diagram(self, quantity, col, reference, **kwargs):
+
+        assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
+        if quantity == "import_export":
+            conns = config.eu_neighs_conns[self.year]
+            assert col in conns, "Valid interconnections can only be one of [" + ", ".join(conns) + "]"
+        else:
+            assert col in self.regions, "Valid regions can only be one of [" + ", ".join(self.regions) + "]"
+        if self.year == 2016 and quantity == 'electricity_prices':
+            assert reference in model_names+['ENTSOE'], "Valid references can only be one of [" + ", ".join(model_names+['ENTSOE']) + "]"
+        else:
+            assert reference in model_names, "Valid references can only be one of [" + ", ".join(model_names) + "]"
+
+        names = model_names.copy()
+        if reference == 'ENTSOE':
+            assert col not in ['NO', 'SE', 'DK'], "No ENTSOE prices for ['NO', 'SE', 'DK'])"
+            x0 = self.entsoe_day_ahead_prices[col].iloc[:8760]
+        else:
+            x0 = getattr(self, quantity)[reference][col]
+            names.remove(reference)
+
+        predictions = [getattr(self, quantity)[model][col] for model in names]
+
+        return plots.taylor_diagram(predictions, x0, names, **kwargs)
 
 
 

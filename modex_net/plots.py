@@ -13,6 +13,10 @@ from matplotlib import pyplot as plt
 from scipy.cluster.hierarchy import dendrogram
 from sklearn.cluster import AgglomerativeClustering
 
+import pickle
+import skill_metrics as sm
+from sys import version_info
+
 from . import config
 
 
@@ -343,3 +347,25 @@ def _annotate_heatmap(im, data=None, valfmt="{x:.2f}",
             texts.append(text)
 
     return texts
+
+def taylor_diagram(predictions, reference, labels, figsize=(16,9), marker='.', linewidth=2., fontsize=20, ncol=1):
+    """
+    Plots a taylor diagram given a collection of time series and a reference.
+    """
+
+    from .ntaylor import ntaylor
+
+    if isinstance(reference, pd.Series):
+        reference = reference.to_numpy()
+    predictions = np.array([p.to_numpy() for p in predictions if isinstance(p, pd.Series)])
+
+    colors = list(matplotlib.colors.TABLEAU_COLORS.values())
+    prop = np.array([[marker, colors[i], colors[i]] for i in range(len(predictions))])
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    ax = ntaylor.diagn(ax, ntaylor.get_statn(reference, predictions), prop, labels=labels,
+                       sigma_color='k', crmse_color='k', r_color='k',
+                       linewidth=linewidth, fontsize=fontsize, ncol=ncol)
+
+    return ax
