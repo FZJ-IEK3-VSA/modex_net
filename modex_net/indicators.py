@@ -106,6 +106,38 @@ metrics = {'wasserstein': wasserstein,
            'correlation': corr}
 
 
+def df_sum(df):
+    return df.sum()
+
+
+def df_mean(df):
+    return df.mean()
+
+
+def df_std(df):
+    return df.std()
+
+
+def df_normalized_std(df):
+    return df.std()/df.mean()
+
+
+def df_percentile(df, percent):
+    return df.quantile(percent).rename(None)
+
+
+def df_percentile_converter(df, percent):
+    return df.clip(0, df_percentile(df, percent), axis=1).sum()
+
+
+operators = {'sum': df_sum,
+             'mean': df_mean,
+             'std': df_std,
+             'normalized_std': df_normalized_std,
+             'percentile': df_percentile,
+             'percentile_converter': df_percentile_converter}
+
+
 def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None, data_source="csv", **kwargs):
     """Returns the appropriate dataframe template filled with zeros."""
 
@@ -335,67 +367,36 @@ class Calculator(object):
         df = df.set_index('ugeo:text').reindex(to_iso2)
         return (df['obsValue:number'].multiply(1e-3) * self.entsoe_mix.sum()).fillna(0)
 
-    def sum(self, quantity):
+    def reduction(self, quantity, operator, percent=0.75, entsoe=True):
 
+        operators_all = ['sum', 'mean', 'std'] + list(operators.keys())
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
+        assert operator in operators, "Valid quantities to measure can only be one of [" + ", ".join(operators_all) + "]"
+        if operator.startswith('percentile'):
+            assert 0. <= percent <= 1., "Percent should be in the [0, 1] domain."
 
-        return (pd.concat([getattr(self, quantity)[model].sum() for model in model_names], axis=1)
-                .rename(columns=dict(enumerate(model_names))))
+        dfs = getattr(self, quantity)
+        models = model_names.copy()
+        if self.year == 2016 and quantity == 'electricity_prices' and entsoe:
+            dfs['ENTSOE'] = self.entsoe_day_ahead_prices
+            models = models + ['ENTSOE']
+        return (pd.concat([operators[operator](dfs[model], percent) if operator.startswith('percentile') else
+                           operators[operator](dfs[model])
+                           for model in models], axis=1)
+                .rename(columns=dict(enumerate(models))))
 
-    def mean(self, quantity):
+    def plot_dendrogram(self, quantity, func, percent=None, entsoe=False, **kwargs):
 
-        assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
-
-        return (pd.concat([getattr(self, quantity)[model].mean() for model in model_names], axis=1)
-                .rename(columns=dict(enumerate(model_names))))
-
-    def normalized_std(self, quantity):
-
-        assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
-
-        return (pd.concat([getattr(self, quantity)[model].std()/getattr(self, quantity)[model].mean()
-                           for model in model_names], axis=1)
-                .rename(columns=dict(enumerate(model_names))))
-
-    def percentile(self, quantity, percent=0.75):
-
-        assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
-        assert 0. <= percent <= 1., "Percent should be in the [0, 1] domain."
-
-        return (pd.concat([getattr(self, quantity)[model].quantile(percent).rename(None)
-                           for model in model_names], axis=1)
-                .rename(columns=dict(enumerate(model_names))))
-
-    def percentile_converter(self, quantity, percent=0.75):
-
-        converter_capacities = self.percentile(quantity, percent)
-
-        return (pd.concat([getattr(self, quantity)[model].clip(0, converter_capacities[model], axis=1).sum()
-                           for model in model_names], axis=1)
-                .rename(columns=dict(enumerate(model_names))))
-
-    def plot_dendrogram(self, quantity, func, percent=None, **kwargs):
-
-        one_arg_funcs = ['sum', 'mean', 'normalized_std']
-        two_arg_funcs = ["percentile", "percentile_converter"]
-        all_funcs = one_arg_funcs + two_arg_funcs
-
-        assert func in all_funcs, "Valid functions can only be one of [" + ", ".join(all_funcs) + "]"
-
-        if percent:
-            if func in two_arg_funcs:
-                return plots.plot_dendrogram(getattr(self, func)(quantity, percent).transpose(), **kwargs)
-            else:
-                logger.warning("This function does not  accept a second argument. It is ignored.")
-        return plots.plot_dendrogram(getattr(self, func)(quantity).transpose(), **kwargs)
+        return plots.plot_dendrogram(self.reduction(quantity, func, percent, entsoe).transpose(), **kwargs)
 
     def pair_distance_single(self, quantity, metric, model):
 
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
         assert metric in metrics.keys(), "Valid metrics can only be one of [" + ", ".join(metrics.keys()) + "]"
 
-        return (pd.concat([(getattr(self, quantity)[model]
-                            .combine(getattr(self, quantity)[mod], metrics[metric])
+        dfs = getattr(self, quantity)
+        return (pd.concat([(dfs[model]
+                            .combine(dfs[mod], metrics[metric])
                             .iloc[0]
                             .rename(None))
                            for mod in model_names], axis=1)
@@ -423,11 +424,12 @@ class Calculator(object):
 
     def energy_mix_indicator(self):
 
+        energy_mix = self.energy_mix
         def em_indicator(df1, df2):
             reg_indicator = (df1 - df2).abs().sum().divide(df1.sum())
             return (reg_indicator * df1.sum()).sum() / df1.sum().sum()
 
-        return pd.concat([pd.Series([em_indicator(self.energy_mix[m1], self.energy_mix[m2]) for m2 in model_names],
+        return pd.concat([pd.Series([em_indicator(energy_mix[m1], energy_mix[m2]) for m2 in model_names],
                                     index=model_names)
                           for m1 in model_names], axis=1).rename(columns=dict(enumerate(model_names)))
 
