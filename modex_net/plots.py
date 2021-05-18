@@ -13,10 +13,6 @@ from matplotlib import pyplot as plt
 from scipy.cluster.hierarchy import dendrogram
 from sklearn.cluster import AgglomerativeClustering
 
-import pickle
-import skill_metrics as sm
-from sys import version_info
-
 from . import config
 
 

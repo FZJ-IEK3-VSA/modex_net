@@ -20,5 +20,5 @@ setup(
         'scipy',
         'pandas',
         'matplotlib',
-        'scikit-learn'
+        'scikit-learn',
     ])
