@@ -423,18 +423,21 @@ class Calculator(object):
 
     def plot_energy_mix(self, relative=False, aggregate=False, entsoe=True, title=None, ylabel="TWh", ylim=None, **kwargs):
 
-        labels = [m for m in self.energy_mix.keys() if self.energy_mix[m].sum().sum()]
-        dfs = [self.energy_mix[m].T.replace(',', '.', regex=True).astype(float) for m in labels]
+        energy_mix = self.energy_mix
+        labels = [m for m in energy_mix.keys() if energy_mix[m].sum().sum()]
+        dfs = [energy_mix[m].T.replace(',', '.', regex=True).astype(float) for m in labels]
 
         if entsoe and self.year == 2016:
             dfs.append(self.entsoe_mix.T)
             labels.append("ENTSO-E")
 
+        carriers = config.carriers_all
         if aggregate:
             agg_dict = config.aggregate_carriers.copy()
             dfs = [df.groupby(agg_dict, axis=1).sum() for df in dfs]
-            dfs = [df[sorted(df.columns, key=lambda s:  [i for i, x in enumerate(config.carriers_reduced) if x == s])]
-                   for df in dfs]  # sort carriers
+            carriers = config.carriers_reduced
+        # sort carriers
+        dfs = [df[sorted(df.columns, key=lambda s: [i for i, x in enumerate(carriers) if x == s])] for df in dfs]
 
         if relative:
             for i in range(len(dfs)):
