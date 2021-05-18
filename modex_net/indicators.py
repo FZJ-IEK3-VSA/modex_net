@@ -351,15 +351,21 @@ class Calculator(object):
         self.entsoe_factsheets_net_exchanges = pd.read_csv(os.path.join(data_path,
                                                                         "entsoe_factsheets-net-exchanges-2016.csv"),
                                                            index_col='name')['exchange']
-        self.entsoe_day_ahead_prices = pd.read_csv(os.path.join(data_path, "entsoe_day_ahead_prices_2016.csv"),
-                                                   index_col='snapshots')
-        self.eea_emissions = self._read_eea_emissions()
+        self.entsoe_day_ahead_prices = self._read_entsoe_prices(data_path)
+        self.eea_emissions = self._read_eea_emissions(data_path)
         # add zeros to missing countries
         for missing_col in ['NO', 'DK', 'SE']:
             self.entsoe_day_ahead_prices[missing_col] = 0.
 
-    def _read_eea_emissions(self):
-        data_path = os.path.join(os.path.dirname(__file__), "..", "data")
+    @staticmethod
+    def _read_entsoe_prices(data_path):
+        df = pd.read_csv(os.path.join(data_path, "entsoe_day_ahead_prices_2016.csv"),
+                         index_col='snapshots', parse_dates=True)
+        df.index = pd.to_datetime(df.index, utc=True).tz_localize(None)
+        df.index = df.index + pd.DateOffset(hours=1)
+        return df
+
+    def _read_eea_emissions(self, data_path):
         to_iso2 = config.eu_neighs_ISO2.set_index('eu_neighs_full_name')['eu_neighs_ISO2']
         df = pd.read_csv(os.path.join(data_path, 'co2-emission-intensity-from-electricity-generation-2.csv'))
         df = df[df['date:number'] == 2016]
@@ -548,7 +554,8 @@ class Calculator(object):
             x0 = getattr(self, quantity)[reference][col]
             names.remove(reference)
 
-        predictions = [getattr(self, quantity)[model][col] for model in names]
+        dfs = getattr(self, quantity)
+        predictions = [dfs[model][col] for model in names]
 
         return plots.taylor_diagram(predictions, x0, names, **kwargs)
 
