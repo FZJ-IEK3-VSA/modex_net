@@ -321,9 +321,19 @@ class Calculator(object):
                                                            index_col='name')['exchange']
         self.entsoe_day_ahead_prices = pd.read_csv(os.path.join(data_path, "entsoe_day_ahead_prices_2016.csv"),
                                                    index_col='snapshots')
+        self.eea_emissions = self._read_eea_emissions()
         # add zeros to missing countries
         for missing_col in ['NO', 'DK', 'SE']:
             self.entsoe_day_ahead_prices[missing_col] = 0.
+
+    def _read_eea_emissions(self):
+        data_path = os.path.join(os.path.dirname(__file__), "..", "data")
+        to_iso2 = config.eu_neighs_ISO2.set_index('eu_neighs_full_name')['eu_neighs_ISO2']
+        df = pd.read_csv(os.path.join(data_path, 'co2-emission-intensity-from-electricity-generation-2.csv'))
+        df = df[df['date:number'] == 2016]
+        df['ugeo:text'] = df['ugeo:text'].replace(to_iso2)
+        df = df.set_index('ugeo:text').reindex(to_iso2)
+        return (df['obsValue:number'].multiply(1e-3) * self.entsoe_mix.sum()).fillna(0)
 
     def sum(self, quantity):
 
