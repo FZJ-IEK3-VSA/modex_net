@@ -7,9 +7,8 @@ import os
 import pandas as pd
 import numpy as np
 import calendar
-from scipy.stats import wasserstein_distance, gaussian_kde
 
-from . import plots, config
+from . import plots, config, metrics, operators
 from progressbar import ProgressBar
 from modex_net_oep import ModexClient
 
@@ -34,108 +33,9 @@ quantities_categorical = ["energy_mix"]    # Dataframes, carrier/regions
 quantities = quantities_time + quantities_categorical
 
 
-def wasserstein(a, b):
-    x_min = min([a.min(), b.min()])
-    x_max = max([a.max(), b.max()])
-    x = np.linspace(x_min, x_max, 1000)
+metrics_dict = metrics.metrics_dict
 
-    pdf_a = gaussian_kde(a)
-    pdf_b = gaussian_kde(b)
-    return wasserstein_distance(pdf_a(x), pdf_b(x))
-
-
-def bhattacharyya(a, b):
-    """ Bhattacharyya distance between distributions (lists of floats).
-    see https://gist.github.com/miku/1671b2014b003ee7b9054c0618c805f7
-    """
-    if not len(a) == len(b):
-        raise ValueError("a and b must be of the same size")
-    x_min = min([min(a), min(b)])
-    x_max = max([max(a), max(b)])
-    x = np.linspace(x_min, x_max, 1000)
-
-    pdf_a = gaussian_kde(a)
-    pdf_b = gaussian_kde(b)
-    if sum(pdf_a(x)) and sum(pdf_b(x)):
-        return -np.log(sum((np.sqrt(u * w) for u, w in zip(pdf_a(x)/sum(pdf_a(x)), pdf_b(x)/sum(pdf_b(x))))))
-    else:
-        return -0.01
-
-
-def max_diff(a, b):
-    return (a - b).abs().max()
-
-
-def mape(a, b):
-    from sklearn.metrics import mean_absolute_percentage_error
-    return mean_absolute_percentage_error(a, b)
-
-
-def euclidean(a, b):
-    return np.linalg.norm(a - b)
-
-
-def frechet(a, b):
-    import frechetdist
-    return frechetdist.frdist([range(len(a)), a], [range(len(b)), b])
-
-
-def dtw(a, b):
-
-    # import module from given path: https://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path
-    import importlib.util
-    dtw_mod_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dtw", "dtw", "dtw.py"))
-    spec = importlib.util.spec_from_file_location("dtw", dtw_mod_path)
-    dtw_mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(dtw_mod)
-
-    return dtw_mod.accelerated_dtw(a.values, b.values, 'minkowski', p=1)[0]
-
-
-def corr(a, b):
-    return a.corr(b)
-
-
-metrics = {'wasserstein': wasserstein,
-           'bhattacharyya': bhattacharyya,
-           'max_diff': max_diff,
-           'mape': mape,
-           'euclidean': euclidean,
-           'frechet': frechet,
-           'dtw': dtw,
-           'correlation': corr}
-
-
-def df_sum(df):
-    return df.sum()
-
-
-def df_mean(df):
-    return df.mean()
-
-
-def df_std(df):
-    return df.std()
-
-
-def df_normalized_std(df):
-    return df.std()/df.mean()
-
-
-def df_percentile(df, percent):
-    return df.quantile(percent).rename(None)
-
-
-def df_percentile_converter(df, percent):
-    return df.clip(0, df_percentile(df, percent), axis=1).sum()
-
-
-operators = {'sum': df_sum,
-             'mean': df_mean,
-             'std': df_std,
-             'normalized_std': df_normalized_std,
-             'percentile': df_percentile,
-             'percentile_converter': df_percentile_converter}
+operators_dict = operators.operators_dict
 
 
 def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None, data_source="csv", **kwargs):
@@ -375,9 +275,8 @@ class Calculator(object):
 
     def reduction(self, quantity, operator, percent=0.75, entsoe=True):
 
-        operators_all = ['sum', 'mean', 'std'] + list(operators.keys())
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
-        assert operator in operators, "Valid quantities to measure can only be one of [" + ", ".join(operators_all) + "]"
+        assert operator in operators_dict, "Valid quantities to measure can only be one of [" + ", ".join(operators_dict.keys()) + "]"
         if operator.startswith('percentile'):
             assert 0. <= percent <= 1., "Percent should be in the [0, 1] domain."
 
@@ -386,8 +285,8 @@ class Calculator(object):
         if self.year == 2016 and quantity == 'electricity_prices' and entsoe:
             dfs['ENTSOE'] = self.entsoe_day_ahead_prices
             models = models + ['ENTSOE']
-        return (pd.concat([operators[operator](dfs[model], percent) if operator.startswith('percentile') else
-                           operators[operator](dfs[model])
+        return (pd.concat([operators_dict[operator](dfs[model], percent) if operator.startswith('percentile') else
+                           operators_dict[operator](dfs[model])
                            for model in models], axis=1)
                 .rename(columns=dict(enumerate(models))))
 
@@ -398,11 +297,11 @@ class Calculator(object):
     def pair_distance_single(self, quantity, metric, model):
 
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
-        assert metric in metrics.keys(), "Valid metrics can only be one of [" + ", ".join(metrics.keys()) + "]"
+        assert metric in metrics_dict.keys(), "Valid metrics can only be one of [" + ", ".join(metrics_dict.keys()) + "]"
 
         dfs = getattr(self, quantity)
         return (pd.concat([(dfs[model]
-                            .combine(dfs[mod], metrics[metric])
+                            .combine(dfs[mod], metrics_dict[metric])
                             .iloc[0]
                             .rename(None))
                            for mod in model_names], axis=1)
@@ -411,7 +310,7 @@ class Calculator(object):
     def pair_distance(self, quantity, metric):
 
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
-        assert metric in metrics.keys(), "Valid metrics can only be one of [" + ", ".join(metrics.keys()) + "]"
+        assert metric in metrics_dict.keys(), "Valid metrics can only be one of [" + ", ".join(metrics_dict.keys()) + "]"
 
         return {model: self.pair_distance_single(quantity, metric, model) for model in model_names}
 
@@ -480,7 +379,7 @@ class Calculator(object):
             df = self.energy_mix_indicator()
             title = None
         else:
-            assert metric in metrics.keys(), "Valid metrics can only be one of [" + ", ".join(metrics.keys()) + "]"
+            assert metric in metrics_dict.keys(), "Valid metrics can only be one of [" + ", ".join(metrics_dict.keys()) + "]"
             assert model in model_names, "Valid model names can only be one of [" + ", ".join(model_names) + "]"
             df = self.pair_distance_single(quantity, metric, model)
             title = model + " model"

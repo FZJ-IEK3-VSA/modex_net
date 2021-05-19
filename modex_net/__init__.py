@@ -3,4 +3,4 @@
 @author: Chloi Syranidou
 """
 
-from . import indicators, plots, oepcli
+from . import indicators, plots
