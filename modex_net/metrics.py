@@ -36,6 +36,10 @@ def bhattacharyya(a, b):
         return -0.01
 
 
+def bhattacharyya_norm(a, b):
+    return bhattacharyya(a - a.mean(), b - b.mean())
+
+
 def max_diff(a, b):
     return (a - b).abs().max()
 
@@ -72,6 +76,7 @@ def corr(a, b):
 
 metrics_dict = {'wasserstein': wasserstein,
                 'bhattacharyya': bhattacharyya,
+                'bhattacharyya_norm': bhattacharyya_norm,
                 'max_diff': max_diff,
                 'mape': mape,
                 'euclidean': euclidean,
