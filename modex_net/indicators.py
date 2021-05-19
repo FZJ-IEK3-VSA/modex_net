@@ -398,21 +398,22 @@ class Calculator(object):
                                       config.eu_neighs_ISO2['eu_neighs_ISO2'].to_list()],
                                      index=['CWE', '"CEE"', 'Nordic', 'All'])
 
+        def pairs(d, reg):
+            return [((d[pair[0]] - d[pair[1]]).abs() < 0.01) for pair in combinations(region_countries[reg], 2)]
+
         prices = self.electricity_prices
         regional_convergence = pd.DataFrame(index=model_names + ['ENTSOE'], columns=region_countries.index)
         for model_name in model_names:
             for region in regional_convergence.columns:
 
                 df = prices[model_name]
-                pairs = [((df[pair[0]] - df[pair[1]]).abs() < 0.01) for pair in
-                         combinations(region_countries[region], 2)]
-                regional_convergence.loc[model_name, region] = functools.reduce(operator.and_, pairs).sum() / 87.6
+                regional_convergence.loc[model_name, region] = functools.reduce(operator.and_,
+                                                                                pairs(df, region)).sum() / 87.6
 
                 if self.year == 2016:
                     df = self.entsoe_day_ahead_prices
-                    pairs = [((df[pair[0]] - df[pair[1]]).abs() < 0.01) for pair in
-                             combinations(region_countries[region], 2)]
-                    regional_convergence.loc['ENTSOE', region] = functools.reduce(operator.and_, pairs).sum() / 87.6
+                    regional_convergence.loc['ENTSOE', region] = functools.reduce(operator.and_,
+                                                                                  pairs(df, region)).sum() / 87.6
                     if region == 'Nordic':
                         regional_convergence.loc['ENTSOE', region] = 0.
 
@@ -431,6 +432,20 @@ class Calculator(object):
 
         return {'regional convergence': regional_convergence,
                 'interconnection convergence': interconn_convergence}
+
+    def net_balances(self):
+        imex = self.import_export
+        net_balances = pd.DataFrame(columns=model_names, index=self.regions)
+        for model in net_balances.columns:
+            df = imex[model]
+            for country in net_balances.index:
+                conns_export = [i for i in df.columns if i.split('_')[0] == country]
+                conns_import = [i for i in df.columns if i.split('_')[1] == country]
+                net_balances.at[country, model] = df[conns_import].sum().sum() - df[conns_export].sum().sum()
+        if self.year == 2016:
+            net_balances['ENTSOE'] = self.entsoe_factsheets_net_balance
+        net_balances.index.name = ''
+        return net_balances
 
     def plot_taylor_diagram(self, quantity, col, reference, **kwargs):
 
