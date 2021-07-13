@@ -189,7 +189,7 @@ def diagn(ax, statn, prop, labels=None, sigma_lim=None, sigma_color='k',
     #ax.set_xticks(np.arange(0., 1.625, .25))
     #ax.set_xticklabels(['1.00', '0.75', '0.50', '0.25', '0.00', '0.25', '0.50'], fontsize=fontsize)
     ax.spines['bottom'].set_color(crmse_color)
-    ax.set_xticklabels([round(i, 2) for i in ax.get_xticks()], fontsize=fontsize)
+    ax.set_xticklabels([abs(round(i - 1, 2)) for i in ax.get_xticks()], fontsize=fontsize)
     ax.tick_params(axis='x', colors=crmse_color)
     ax.xaxis.label.set_color(crmse_color)
     if no_crmse_axis:
