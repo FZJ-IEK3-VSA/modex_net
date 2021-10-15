@@ -338,7 +338,8 @@ class Calculator(object):
                                     index=model_names)
                           for m1 in model_names], axis=1).rename(columns=dict(enumerate(model_names)))
 
-    def plot_energy_mix(self, relative=False, aggregate=False, entsoe=True, title=None, ylabel="TWh", ylim=None, **kwargs):
+    def plot_energy_mix(self, relative=False, aggregate=False, entsoe=True, title=None, ylabel="TWh", ylim=None,
+                        savefig=None, dpi=300, **kwargs):
 
         energy_mix = self.energy_mix
         labels = [m for m in energy_mix.keys() if energy_mix[m].sum().sum()]
@@ -367,7 +368,7 @@ class Calculator(object):
         dfs = [df.reindex(dfs[0].index.sort_values()) for df in dfs]  # align indices by sorting them
 
         return plots.plot_clustered_stacked(dfs, labels=labels, title=title, ylabel=ylabel, ylim=ylim,
-                                            **kwargs)
+                                            savefig=savefig, dpi=dpi, **kwargs)
 
     def plot_heatmap(self, quantity, metric=None, model=None, **kwargs):
 

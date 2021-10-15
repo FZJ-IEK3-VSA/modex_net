@@ -116,7 +116,7 @@ def plot_load_duration_df(df, title=None, ylabel=None, legend=True, figsize=(8,6
 
 # inspired by https://stackoverflow.com/questions/22787209/how-to-have-clusters-of-stacked-bars-with-python-pandas
 def plot_clustered_stacked(dfall, labels=None, figsize=(16,9), title=None, ylabel=None, ylim=None,
-                           fontsize=config.fontsize, **kwargs):
+                           fontsize=config.fontsize, savefig=None, dpi=300, **kwargs):
     """Given a list of dataframes, with identical columns and index, create a clustered stacked bar plot.
     labels is a list of the names of the dataframe, used for the legend
     title is a string for the title of the plot
@@ -165,6 +165,9 @@ def plot_clustered_stacked(dfall, labels=None, figsize=(16,9), title=None, ylabe
     axe.add_artist(l1)
 
     plt.tight_layout()
+
+    if savefig: plt.savefig(savefig, bbox_inches='tight', dpi=dpi)
+
     plt.show()
 
     return axe
