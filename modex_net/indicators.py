@@ -27,7 +27,7 @@ quantities_time = [
 
                    "import_export",        # Dataframes, time/interconnections
 
-                   "electricity_prices"   # Dataframes, time/regions
+                   "electricity_prices"    # Dataframes, time/regions
                   ]
 quantities_categorical = ["energy_mix"]    # Dataframes, carrier/regions
 quantities = quantities_time + quantities_categorical
@@ -38,11 +38,11 @@ metrics_dict = metrics.metrics_dict
 operators_dict = operators.operators_dict
 
 
-def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None, data_source="csv", **kwargs):
+def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None, data_source="csv", token=""):
     """Returns the appropriate dataframe template filled with zeros."""
 
     if data_source == "oep":
-        cli = ModexClient(**kwargs)
+        cli = OepClient(token=token)
     if index_name == "snapshots":
         drop_hours = 1
         if calendar.isleap(year) and not config.leap_years:
@@ -52,7 +52,7 @@ def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None, d
         if data_source == "csv":
             index = config.carriers_all
         elif data_source == "oep":
-            index = pd.DataFrame.from_records(cli.select_table("mn_dimension_carrier"))['carrier'].tolist()
+            index = pd.DataFrame.from_records(cli.select_from_table("mn_dimension_carrier"))['carrier'].tolist()
     else:
         raise ValueError("index_name can only be either snapshots or carrier")
     if columns is None:
@@ -62,12 +62,12 @@ def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None, d
             if data_source == "csv":
                 columns = config.eu_neighs_ISO2['eu_neighs_ISO2']
             elif data_source == "oep":
-                columns = pd.DataFrame.from_records(cli.select_table("mn_dimension_country"))['country_code'].tolist()
+                columns = pd.DataFrame.from_records(cli.select_from_table("mn_dimension_country"))['country_code'].tolist()
             if level == "grid" and quantity != "energy_mix":
                 if data_source == "csv":
                     columns = config.de_nuts1['de_nuts1_full_name']
                 elif data_source == "oep":
-                    columns = pd.DataFrame.from_records(cli.select_table("mn_dimension_region"))['region_code'].tolist()
+                    columns = pd.DataFrame.from_records(cli.select_from_table("mn_dimension_region"))['region_code'].tolist()
     df = pd.DataFrame(np.zeros((len(index), len(columns))), index=index, columns=columns)
     df.index.name = index_name
     return df
@@ -111,7 +111,8 @@ class Calculator(object):
                     else:
                         raise ValueError(quantity + " not in [" + ", ".join(quantities) + "]")
 
-                    df_0 = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
+                    df_0 = _zeros_df_t(self.year, index_name, self.level, quantity=quantity,
+                                       data_source=self.data_source, token=self.oep_token)
 
                     if self.data_source == "csv":
 
@@ -123,11 +124,13 @@ class Calculator(object):
                         except FileNotFoundError:
                             logger.error(quantity + " for model " + model + " was not found. Returning zeros.")
                             self.warning_flags.at[model, quantity] = "Missing file. Zeros"
-                            df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
+                            df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity,
+                                             data_source=self.data_source, token=self.oep_token)
                         except:
                             logger.error("Reading" + quantity + " for model " + model + " failed. Returning zeros.")
-                            self.warning_flags.at[model, quantity] = "Missing file. Zeros"
-                            df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
+                            self.warning_flags.at[model, quantity] = "Missing table. Zeros"
+                            df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity,
+                                             data_source=self.data_source, token=self.oep_token)
 
                     elif self.data_source == "oep":
                         table_name = f'modexnet_{model}_{self.year}_{self.level}_{quantity}'
@@ -153,7 +156,8 @@ class Calculator(object):
                         except:
                             logger.error("Table for " + model + " could not be retrieved. Returning zeros.")
                             self.warning_flags.at[model, quantity] = "Missing table. Zeros"
-                            df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
+                            df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity,
+                                             data_source=self.data_source, token=self.oep_token)
 
                     else:
                         raise NotImplementedError("Available data sources: csv, oep")
@@ -170,7 +174,8 @@ class Calculator(object):
                     missing_cols = df_0.columns.difference(df.columns)
                     existing_cols = df_0.columns.intersection(df.columns)
                     df = pd.concat([df[existing_cols].reindex(df_0.index),
-                                    _zeros_df_t(self.year, index_name, columns=missing_cols)],
+                                    _zeros_df_t(self.year, index_name, columns=missing_cols,
+                                                data_source=self.data_source, token=self.oep_token)],
                                    axis=1)
 
                     getattr(self, '_' + quantity).update({model: df.fillna(0)})
