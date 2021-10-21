@@ -10,7 +10,7 @@ import calendar
 
 from . import plots, config, metrics, operators
 from progressbar import ProgressBar
-from modex_net_oep import ModexClient
+from oep_client import OepClient
 
 import logging
 logger = logging.getLogger(__name__)
@@ -130,8 +130,9 @@ class Calculator(object):
                             df = _zeros_df_t(self.year, index_name, self.level, quantity=quantity)
 
                     elif self.data_source == "oep":
+                        table_name = f'modexnet_{model}_{self.year}_{self.level}_{quantity}'
                         try:
-                            data = self.cli.download_parameter(self.year, self.level, self.scenario, quantity, model)
+                            data = self.cli.select_from_table(table_name)
                             df = pd.DataFrame.from_records(data)
                             if quantity == "energy_mix":
                                 df = df.pivot_table(index='carrier', columns='country_code', values='value')
@@ -199,8 +200,7 @@ class Calculator(object):
 
     energy_mix = _quantity_get_set("energy_mix")
 
-    def __init__(self, year, level, scenario, data_source="csv", data_path=None,
-                 oep_token="", oep_modex_user="c.syranidou@fz-juelich.de"):
+    def __init__(self, year, level, scenario, data_source="csv", data_path=None, oep_token=""):
 
         logging.basicConfig(level=logging.INFO)
         logger.info("All methods assume hourly profiles.")
@@ -231,10 +231,9 @@ class Calculator(object):
 
         if data_source == "oep":
             self.oep_token = oep_token
-            self.oep_user = oep_modex_user
-            self.cli = ModexClient(token=self.oep_token, user=self.oep_user)
+            self.cli = OepClient(token=self.oep_token)
             self._time_map = pd.to_datetime(
-                pd.DataFrame.from_records(self.cli.select_table("mn_dimension_time"))
+                pd.DataFrame.from_records(self.cli.select_from_table("modexnet_dimension_time"))
                 .set_index('hour')[f'timestamp_{self.year}'])
 
         for quantity in quantities:
