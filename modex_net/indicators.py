@@ -205,7 +205,8 @@ class Calculator(object):
 
     energy_mix = _quantity_get_set("energy_mix")
 
-    def __init__(self, year, level, scenario, data_source="csv", data_path=None, oep_token=""):
+    def __init__(self, year, level, scenario, data_source="csv", data_path=None, oep_token="", entsoe=False,
+                 entsoe_path=""):
 
         logging.basicConfig(level=logging.INFO)
         logger.info("All methods assume hourly profiles.")
@@ -246,38 +247,47 @@ class Calculator(object):
 
         self.warning_flags = pd.DataFrame(index=model_names, columns=quantities).fillna("Unknown.")
 
-        data_path = os.path.join(os.path.dirname(__file__), "..", "data")
-        self.entsoe_mix = pd.read_csv(os.path.join(data_path, "entso-e-energy-mix-modex.csv"),
-                                      index_col='carrier').reindex(config.carriers_all)
-        self.entsoe_factsheets_net_balance = pd.read_csv(os.path.join(data_path,
-                                                                      "entsoe_factsheets-net-balance-2016.csv"),
-                                                         index_col='name')['imp-exp']
-        self.entsoe_factsheets_net_exchanges = pd.read_csv(os.path.join(data_path,
-                                                                        "entsoe_factsheets-net-exchanges-2016.csv"),
-                                                           index_col='name')['exchange']
-        self.entsoe_day_ahead_prices = self._read_entsoe_prices(data_path)
-        self.eea_emissions = self._read_eea_emissions(data_path)
-        # add zeros to missing countries
-        for missing_col in ['NO', 'DK', 'SE']:
-            self.entsoe_day_ahead_prices[missing_col] = 0.
+        if entsoe_path:
+            self.entsoe_path = entsoe_path
+        else:
+            self.entsoe_path = os.path.join(os.path.dirname(__file__), "..", "data")
 
-    @staticmethod
-    def _read_entsoe_prices(data_path):
-        df = pd.read_csv(os.path.join(data_path, "entsoe_day_ahead_prices_2016.csv"),
+        if entsoe:
+            self.entsoe = True
+        else:
+            self.entsoe = False
+
+    def _entsoe_mix(self):
+        return pd.read_csv(os.path.join(self.entsoe_path, "entso-e-energy-mix-modex.csv"),
+                           index_col='carrier').reindex(config.carriers_all)
+
+    def _entsoe_factsheets_net_balance(self):
+        return pd.read_csv(os.path.join(self.entsoe_path, "entsoe_factsheets-net-balance-2016.csv"),
+                           index_col='name')['imp-exp']
+
+    def _entsoe_factsheets_net_exchanges(self):
+        return pd.read_csv(os.path.join(self.entsoe_path, "entsoe_factsheets-net-exchanges-2016.csv"),
+                           index_col='name')['exchange']
+
+    def _entsoe_day_ahead_prices(self):
+        df = pd.read_csv(os.path.join(self.entsoe_path, "entsoe_day_ahead_prices_2016.csv"),
                          index_col='snapshots', parse_dates=True)
         df.index = pd.to_datetime(df.index, utc=True).tz_localize(None)
         df.index = df.index + pd.DateOffset(hours=1)
+
+        for missing_col in ['NO', 'DK', 'SE']:
+            df[missing_col] = 0.
         return df
 
-    def _read_eea_emissions(self, data_path):
+    def _eea_emissions(self):
         to_iso2 = config.eu_neighs_ISO2.set_index('eu_neighs_full_name')['eu_neighs_ISO2']
-        df = pd.read_csv(os.path.join(data_path, 'co2-emission-intensity-from-electricity-generation-2.csv'))
+        df = pd.read_csv(os.path.join(elf.entsoe_path, 'co2-emission-intensity-from-electricity-generation-2.csv'))
         df = df[df['date:number'] == 2016]
         df['ugeo:text'] = df['ugeo:text'].replace(to_iso2)
         df = df.set_index('ugeo:text').reindex(to_iso2)
-        return (df['obsValue:number'].multiply(1e-3) * self.entsoe_mix.sum()).fillna(0)
+        return (df['obsValue:number'].multiply(1e-3) * self._entsoe_mix().sum()).fillna(0)
 
-    def reduction(self, quantity, operator, percent=0.75, entsoe=True):
+    def reduction(self, quantity, operator, percent=0.75):
 
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
         assert operator in operators_dict, "Valid quantities to measure can only be one of [" + ", ".join(operators_dict.keys()) + "]"
@@ -286,17 +296,17 @@ class Calculator(object):
 
         dfs = getattr(self, quantity)
         models = model_names.copy()
-        if self.year == 2016 and quantity == 'electricity_prices' and entsoe:
-            dfs['ENTSOE'] = self.entsoe_day_ahead_prices
+        if self.year == 2016 and quantity == 'electricity_prices' and self.entsoe:
+            dfs['ENTSOE'] = self._entsoe_day_ahead_prices()
             models = models + ['ENTSOE']
         return (pd.concat([operators_dict[operator](dfs[model], percent) if operator.startswith('percentile') else
                            operators_dict[operator](dfs[model])
                            for model in models], axis=1)
                 .rename(columns=dict(enumerate(models))))
 
-    def plot_dendrogram(self, quantity, func, percent=None, entsoe=False, **kwargs):
+    def plot_dendrogram(self, quantity, func, percent=None, **kwargs):
 
-        return plots.plot_dendrogram(self.reduction(quantity, func, percent, entsoe).transpose(), **kwargs)
+        return plots.plot_dendrogram(self.reduction(quantity, func, percent).transpose(), **kwargs)
 
     def pair_distance_single(self, quantity, metric, model):
 
@@ -342,15 +352,15 @@ class Calculator(object):
                                     index=model_names)
                           for m1 in model_names], axis=1).rename(columns=dict(enumerate(model_names)))
 
-    def plot_energy_mix(self, relative=False, aggregate=False, entsoe=True, title=None, ylabel="TWh", ylim=None,
+    def plot_energy_mix(self, relative=False, aggregate=False, title=None, ylabel="TWh", ylim=None,
                         savefig=None, dpi=300, **kwargs):
 
         energy_mix = self.energy_mix
         labels = [m for m in energy_mix.keys() if energy_mix[m].sum().sum()]
         dfs = [energy_mix[m].T.replace(',', '.', regex=True).astype(float) for m in labels]
 
-        if entsoe and self.year == 2016:
-            dfs.append(self.entsoe_mix.T)
+        if self.entsoe and self.year == 2016:
+            dfs.append(self._entsoe_mix().T)
             labels.append("ENTSO-E")
 
         carriers = config.carriers_all
@@ -415,8 +425,8 @@ class Calculator(object):
                 regional_convergence.loc[model_name, region] = functools.reduce(operator.and_,
                                                                                 pairs(df, region)).sum() / 87.6
 
-                if self.year == 2016:
-                    df = self.entsoe_day_ahead_prices
+                if self.year == 2016 and self.entsoe:
+                    df = self._entsoe_day_ahead_prices()
                     regional_convergence.loc['ENTSOE', region] = functools.reduce(operator.and_,
                                                                                   pairs(df, region)).sum() / 87.6
                     if region == 'Nordic':
@@ -427,8 +437,8 @@ class Calculator(object):
             df = prices[model_name]
             for conn in interconn_convergence.index:
                 interconn_convergence.loc[conn, model_name] = (df[conn[:2]] - df[conn[-2:]]).abs().mean()
-            if self.year == 2016:
-                df = self.entsoe_day_ahead_prices
+            if self.year == 2016 and self.entsoe:
+                df = self._entsoe_day_ahead_prices()
                 for conn in interconn_convergence.index:
                     interconn_convergence.loc[conn, 'ENTSOE'] = (df[conn[:2]] - df[conn[-2:]]).abs().mean()
         if 'ENTSOE' in interconn_convergence.columns:
@@ -447,8 +457,8 @@ class Calculator(object):
                 conns_export = [i for i in df.columns if i.split('_')[0] == country]
                 conns_import = [i for i in df.columns if i.split('_')[1] == country]
                 net_balances.at[country, model] = df[conns_import].sum().sum() - df[conns_export].sum().sum()
-        if self.year == 2016:
-            net_balances['ENTSOE'] = self.entsoe_factsheets_net_balance
+        if self.year == 2016 and self.entsoe:
+            net_balances['ENTSOE'] = self._entsoe_factsheets_net_balance()
         net_balances.index.name = ''
         return net_balances
 
@@ -460,7 +470,7 @@ class Calculator(object):
             assert col in conns, "Valid interconnections can only be one of [" + ", ".join(conns) + "]"
         else:
             assert col in self.regions, "Valid regions can only be one of [" + ", ".join(self.regions) + "]"
-        if self.year == 2016 and quantity == 'electricity_prices':
+        if self.year == 2016 and quantity == 'electricity_prices' and self.entsoe:
             assert reference in model_names+['ENTSOE'], "Valid references can only be one of [" + ", ".join(model_names+['ENTSOE']) + "]"
         else:
             assert reference in model_names, "Valid references can only be one of [" + ", ".join(model_names) + "]"
@@ -468,7 +478,7 @@ class Calculator(object):
         names = model_names.copy()
         if reference == 'ENTSOE':
             assert col not in ['NO', 'SE', 'DK'], "No ENTSOE prices for ['NO', 'SE', 'DK'])"
-            x0 = self.entsoe_day_ahead_prices[col].iloc[:8760]
+            x0 = self._entsoe_day_ahead_prices()[col].iloc[:8760]
         else:
             x0 = getattr(self, quantity)[reference][col]
             names.remove(reference)
