@@ -1,0 +1,8 @@
+numpy
+scipy
+pandas
+matplotlib
+sklearn
+progressbar
+similaritymeasures
+oep-client @ git+https://github.com/wingechr/oep-client.git

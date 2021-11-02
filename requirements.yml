@@ -1,0 +1,16 @@
+name: modex_net_env
+channels:
+  - defaults
+dependencies:
+  - python>=3.6
+  - pip
+  - matplotlib
+  - pandas
+  - scikit-learn
+  - numpy
+  - scipy
+  - pip:
+      - progressbar
+      - similaritymeasures
+      - git+https://github.com/wingechr/oep-client.git
+

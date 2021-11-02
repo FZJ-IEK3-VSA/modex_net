@@ -98,6 +98,8 @@ class Calculator(object):
         @property
         def quantity_prop(self):
 
+            logger.info("Retrieving " + quantity)
+
             pbar = ProgressBar()
             for model in pbar(model_names):
 
@@ -205,7 +207,7 @@ class Calculator(object):
 
     energy_mix = _quantity_get_set("energy_mix")
 
-    def __init__(self, year, level, scenario, data_source="csv", data_path=None, oep_token="", entsoe=False,
+    def __init__(self, year, level="market", scenario=None, data_source="csv", data_path=None, oep_token="", entsoe=False,
                  entsoe_path=""):
 
         logging.basicConfig(level=logging.INFO)
