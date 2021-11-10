@@ -23,7 +23,7 @@ source modex_net_env/bin/activate
 ```
 for unix/macOS or alternatively with Anaconda:
 ```
-conda create --file requirements.yml
+conda env create --file requirements.yml
 conda activate modex_net_env
 ```
 

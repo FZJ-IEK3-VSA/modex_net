@@ -1,0 +1,3 @@
+include modex_net/config_files*.csv
+include README.md LICENSE.txt
+include requirements.txt requirements.yml
