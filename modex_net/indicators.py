@@ -76,15 +76,19 @@ def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None, d
 class Calculator(object):
 
     """
-    Toolset for a given scenario.
+    Toolset for generating indicators and visualizations for comparing the market results of power system models.
 
     Args:
         year (int): Year of the scenario.
-        level (string): Level of the scenario. Can only be either "market" or "grid".
-        scenario (string): Name of the scenario.
+        level (string): Level of the scenario. Can only be either "market" or "grid". Defaults to "market".
+        scenario (string): Name of the scenario, optional.
         data_source (string, default "csv"):
             Type of data source. Can only be either "csv" or "oep" for .csv and Open Energy Platform respectively.
-        csv_path (string): Root path of the csv file structure.
+            Defaults to "csv".
+        data_path (string): Root path of the csv file structure, optional.
+        oep_token (string): The API token for the Open Energy Platform, optional.
+        entsoe (boolean): Whether to include ENTSO-E data in the comparison. It requires the necessary files. Defaults to False.
+        entsoe_path (string): The path for the ENTSO-E files, optional.
 
     Example:
         >>> base = Calculator(2016, "market", "base")
@@ -290,6 +294,21 @@ class Calculator(object):
         return (df['obsValue:number'].multiply(1e-3) * self._entsoe_mix().sum()).fillna(0)
 
     def reduction(self, quantity, operator, percent=0.75):
+        """
+        Returns dataframe with the values of the selected quantity reduced by the given operator for all models and
+        regions.
+
+        Args:
+            quantity (string): Selected quantity. Must be one of the available quanities in 'indicators.quantities'.
+            operator (string): Time series reduction method. Must be one of the available operators in
+            'indicators.operators_dict.keys()
+            percent (float): Percentile value for the application of the 'percentile' and 'percentile_converter'
+            operators. Must be between [0, 1]. Optional
+
+        Example:
+            >>> base = Calculator(2016, data_source="oep", oep_token="")
+            >>> df = base.reduction("electricity_prices", "mean")
+        """
 
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
         assert operator in operators_dict, "Valid quantities to measure can only be one of [" + ", ".join(operators_dict.keys()) + "]"
@@ -306,11 +325,39 @@ class Calculator(object):
                            for model in models], axis=1)
                 .rename(columns=dict(enumerate(models))))
 
-    def plot_dendrogram(self, quantity, func, percent=None, **kwargs):
+    def plot_dendrogram(self, quantity, operator, percent=None, **kwargs):
+        """
+        Returns dendrogram plot for the selected quantity reduced by the given operator for all models and
+        regions.
 
-        return plots.plot_dendrogram(self.reduction(quantity, func, percent).transpose(), **kwargs)
+        Args:
+            quantity (string): Selected quantity. Must be one of the available quanities in 'indicators.quantities'.
+            operator (string): Time series reduction method. Must be one of the available operators in
+            'indicators.operators_dict.keys()
+            percent (float): Percentile value for the application of the 'percentile' and 'percentile_converter'
+            operators. Must be between [0, 1]. Optional
+
+        Example:
+            >>> base = Calculator(2016, data_source="oep", oep_token="")
+            >>> ax = base.plot_dendrogram("electricity_prices", "mean")
+        """
+
+        return plots.plot_dendrogram(self.reduction(quantity, operator, percent).transpose(), **kwargs)
 
     def pair_distance_single(self, quantity, metric, model):
+        """
+        Returns dataframe with the distances of the selected model to all other models for the given quantity measured
+        by the given metric.
+
+        Args:
+            quantity (string): Selected quantity. Must be one of the available quanities in 'indicators.quantities'.
+            metric (string): Distance metric. Must be one of the available metrics in 'indicators.metrics_dict.keys().
+            model (string): Model name. Must be one of the indicators.model_names.
+
+        Example:
+            >>> base = Calculator(2016, data_source="oep", oep_token="")
+            >>> df = base.pair_distance_single("electricity_prices", "correlation", "europower")
+        """
 
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
         assert metric in metrics_dict.keys(), "Valid metrics can only be one of [" + ", ".join(metrics_dict.keys()) + "]"
@@ -324,26 +371,35 @@ class Calculator(object):
                 .rename(columns=dict(enumerate(model_names))))
 
     def pair_distance(self, quantity, metric):
+        """
+        Returns a dicitionary of dataframes with the distances of all models to all other models for the given quantity
+        measured by the given metric.
+
+        Args:
+            quantity (string): Selected quantity. Must be one of the available quanities in 'indicators.quantities'.
+            metric (string): Distance metric. Must be one of the available metrics in 'indicators.metrics_dict.keys().
+
+        Example:
+            >>> base = Calculator(2016, data_source="oep", oep_token="")
+            >>> dfs = base.pair_distance("electricity_prices", "correlation")
+        """
 
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
         assert metric in metrics_dict.keys(), "Valid metrics can only be one of [" + ", ".join(metrics_dict.keys()) + "]"
 
         return {model: self.pair_distance_single(quantity, metric, model) for model in model_names}
 
-    def line_overload_incidents(self, threshold=0.7):
-        """
-         Returns the percentage of all line overloads over all time steps. A line overload is considered when it's load
-         exceeds the corresponding capacity times the given threshold.
-        """
-
-        def overload_incidents(df):
-            df = df > threshold
-            return df.sum().sum() / (df.shape[0] * df.shape[1])
-
-        return pd.Series([overload_incidents(df) for df in self.line_loadings.values()],
-                         index=self.line_loadings.keys())
-
     def energy_mix_indicator(self):
+        """
+        Returns dataframe with the error-like indicator for the energy mix for all pairs of models. It is computed as
+        the average of the differences of the energy mix weighted over the fuel types and regions.
+
+        Args:
+
+        Example:
+            >>> base = Calculator(2016, data_source="oep", oep_token="")
+            >>> df = base.energy_mix_indicator()
+        """
 
         energy_mix = self.energy_mix
         def em_indicator(df1, df2):
@@ -356,6 +412,22 @@ class Calculator(object):
 
     def plot_energy_mix(self, relative=False, aggregate=False, title=None, ylabel="TWh", ylim=None,
                         savefig=None, dpi=300, **kwargs):
+        """
+        Returns stacked bar chart of the energy mix for all models and regions.
+
+        Args:
+            relative (boolean): Plot in relative (to the total production) values.
+            aggregate (boolean): Aggregate fuel types based on the 'config.aggregate_carriers' dictionary.
+            title (string): Plot title.
+            ylabel (string): Y axis label.
+            ylim (tuple): Min and max values of the y axis.
+            savefig (string): File name for the saved figure.
+            dpi (float): Resolution of the saved figure.
+
+        Example:
+            >>> base = Calculator(2016, data_source="oep", oep_token="")
+            >>> ax = base.plot_energy_mix()
+        """
 
         energy_mix = self.energy_mix
         labels = [m for m in energy_mix.keys() if energy_mix[m].sum().sum()]
@@ -387,6 +459,20 @@ class Calculator(object):
                                             savefig=savefig, dpi=dpi, **kwargs)
 
     def plot_heatmap(self, quantity, metric=None, model=None, **kwargs):
+        """
+        Returns heatmap plot with the distances of the selected model to all other models for the given quantity
+        measured by the given metric. If quantity == "energy_mix", the heatmap represents the 'energy_mix_indicator' for
+        all pairs of models.
+
+        Args:
+            quantity (string): Selected quantity. Must be one of the available quanities in 'indicators.quantities'.
+            metric (string): Distance metric. Must be one of the available metrics in 'indicators.metrics_dict.keys().
+            model (string): Model name. Must be one of the indicators.model_names.
+
+        Example:
+            >>> base = Calculator(2016, data_source="oep", oep_token="")
+            >>> ax = base.plot_heatmap("electricity_prices", "correlation", "europower")
+        """
 
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
 
@@ -404,6 +490,22 @@ class Calculator(object):
         return plots.plot_heatmap(df, quantity=quantity, metric=metric, title=title, **kwargs)
 
     def price_convergence(self):
+        """
+        Returns dataframes with the 'regional convergence' and 'interconnection convergence' values for all models.
+
+        The 'regional convergence' represents the percentage of full price convergence over all countries inside a
+        region. The regions include the 'CWE', 'CEE', 'Nordic' and 'All' regions as defined by ENTSO-E, where the
+        respective countries are also part of the electrical neighbors of Germany, as defined in 'config.eu_neighs_ISO2'
+
+        The 'interconnection convergence' represents the mean difference of electricity prices over all interconnections
+        as defined in 'config.eu_neighs_conns'.
+
+        Args:
+
+        Example:
+            >>> base = Calculator(2016, data_source="oep", oep_token="")
+            >>> reg_conv, inter_conv = base.price_convergence()
+        """
 
         from itertools import combinations
         import functools
@@ -451,6 +553,16 @@ class Calculator(object):
                 'interconnection convergence': interconn_convergence}
 
     def net_balances(self):
+        """
+        Returns dataframe with the net balances of all models and regions. Positive values correspond to net imports.
+
+        Args:
+
+        Example:
+            >>> base = Calculator(2016, data_source="oep", oep_token="")
+            >>> net_balances = base.net_balances()
+        """
+
         imex = self.import_export
         net_balances = pd.DataFrame(columns=model_names, index=self.regions)
         for model in net_balances.columns:
@@ -464,29 +576,43 @@ class Calculator(object):
         net_balances.index.name = ''
         return net_balances
 
-    def plot_taylor_diagram(self, quantity, col, reference, **kwargs):
+    def plot_taylor_diagram(self, quantity, region, reference_model, **kwargs):
+        """
+        Returns taylor diagram plot for the given quantity (must be a time series), selected region or interconnector
+        and given model as reference.
+
+        Args:
+            quantity (string): Selected quantity. Must be one of the available quanities in 'indicators.quantities'.
+            region (string): Either region name from 'config.eu_neighs_ISO2' or interconnector name from
+            'config.eu_neighs_conns' for the 'import_export' quantity.
+            reference_model (string): Model name. Must be one of the indicators.model_names.
+
+        Example:
+            >>> base = Calculator(2016, data_source="oep", oep_token="")
+            >>> ax = base.plot_taylor_diagram("electricity_prices", "DE", "europower")
+        """
 
         assert quantity in quantities, "Valid quantities to measure can only be one of [" + ", ".join(quantities) + "]"
         if quantity == "import_export":
             conns = config.eu_neighs_conns[self.year]
-            assert col in conns, "Valid interconnections can only be one of [" + ", ".join(conns) + "]"
+            assert region in conns, "Valid interconnections can only be one of [" + ", ".join(conns) + "]"
         else:
-            assert col in self.regions, "Valid regions can only be one of [" + ", ".join(self.regions) + "]"
+            assert region in self.regions, "Valid regions can only be one of [" + ", ".join(self.regions) + "]"
         if self.year == 2016 and quantity == 'electricity_prices' and self.entsoe:
-            assert reference in model_names+['ENTSOE'], "Valid references can only be one of [" + ", ".join(model_names+['ENTSOE']) + "]"
+            assert reference_model in model_names+['ENTSOE'], "Valid references can only be one of [" + ", ".join(model_names+['ENTSOE']) + "]"
         else:
-            assert reference in model_names, "Valid references can only be one of [" + ", ".join(model_names) + "]"
+            assert reference_model in model_names, "Valid references can only be one of [" + ", ".join(model_names) + "]"
 
         names = model_names.copy()
-        if reference == 'ENTSOE':
-            assert col not in ['NO', 'SE', 'DK'], "No ENTSOE prices for ['NO', 'SE', 'DK'])"
+        if reference_model == 'ENTSOE':
+            assert region not in ['NO', 'SE', 'DK'], "No ENTSOE prices for ['NO', 'SE', 'DK'])"
             x0 = self._entsoe_day_ahead_prices()[col].iloc[:8760]
         else:
-            x0 = getattr(self, quantity)[reference][col]
-            names.remove(reference)
+            x0 = getattr(self, quantity)[reference_model][region]
+            names.remove(reference_model)
 
         dfs = getattr(self, quantity)
-        predictions = [dfs[model][col] for model in names]
+        predictions = [dfs[model][region] for model in names]
 
         return plots.taylor_diagram(predictions, x0, names, **kwargs)
 

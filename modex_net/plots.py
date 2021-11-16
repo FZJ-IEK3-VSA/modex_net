@@ -17,8 +17,10 @@ from . import config
 
 
 def _plot_dendrogram(model, color_threshold=0.7, **kwargs):
-    # from https://scikit-learn.org/stable/auto_examples/cluster/plot_agglomerative_dendrogram.html#sphx-glr-auto-examples-cluster-plot-agglomerative-dendrogram-py
-    # Create linkage matrix and then plot the dendrogram
+    """
+    From https://scikit-learn.org/stable/auto_examples/cluster/plot_agglomerative_dendrogram.html#sphx-glr-auto-examples-cluster-plot-agglomerative-dendrogram-py
+    Create linkage matrix and then plot the dendrogram
+    """
 
     # create the counts of samples under each node
     counts = np.zeros(model.children_.shape[0])
@@ -74,6 +76,9 @@ def plot_dendrogram(data, color_threshold=0.7, title=None, figsize=(8,6), linewi
 
 def plot_df(df, title=None, ylabel=None, legend=True, figsize=(8,6), linewidth=config.linewidth,
             fontsize=config.fontsize, savefig=None, dpi=300, **kwargs):
+    """
+    Plot time series dataframe.
+    """
 
     # plotting
     fig, ax = plt.subplots(figsize=figsize)
@@ -91,6 +96,9 @@ def plot_df(df, title=None, ylabel=None, legend=True, figsize=(8,6), linewidth=c
 
 def plot_load_duration_df(df, title=None, ylabel=None, legend=True, figsize=(8,6), linewidth=config.linewidth,
                           fontsize=config.fontsize, savefig=None, dpi=300, **kwargs):
+    """
+    Plots duration curve of time series dataframe.
+    """
 
     df = df.copy()
 
@@ -114,13 +122,16 @@ def plot_load_duration_df(df, title=None, ylabel=None, legend=True, figsize=(8,6
     return ax
 
 
-# inspired by https://stackoverflow.com/questions/22787209/how-to-have-clusters-of-stacked-bars-with-python-pandas
 def plot_clustered_stacked(dfall, labels=None, figsize=(16,9), title=None, ylabel=None, ylim=None,
                            fontsize=config.fontsize, savefig=None, dpi=300, **kwargs):
-    """Given a list of dataframes, with identical columns and index, create a clustered stacked bar plot.
+    """
+    Given a list of dataframes, with identical columns and index, create a clustered stacked bar plot.
     labels is a list of the names of the dataframe, used for the legend
     title is a string for the title of the plot
-    H is the hatch used for identification of the different dataframe"""
+    H is the hatch used for identification of the different dataframe
+
+    Inspired by https://stackoverflow.com/questions/22787209/how-to-have-clusters-of-stacked-bars-with-python-pandas
+    """
 
     H = "/"
 
@@ -175,6 +186,9 @@ def plot_clustered_stacked(dfall, labels=None, figsize=(16,9), title=None, ylabe
 
 def plot_heatmap(df, quantity, metric=None, title=None, figsize=(9,16), fontsize=config.fontsize, savefig=None, dpi=300,
                  **kwargs):
+    """
+    Returns heatmap plot for a given dataframe. Green values indicate shorter distances, whereas red higher ones.
+    """
 
     fig, ax = plt.subplots(1, 1, figsize=figsize)
 
@@ -216,10 +230,11 @@ def plot_heatmap(df, quantity, metric=None, title=None, figsize=(9,16), fontsize
     return ax
 
 
-# heatmap fucnctions from https://matplotlib.org/3.1.1/gallery/images_contours_and_fields/image_annotated_heatmap.html
 def _heatmap(data, row_labels, col_labels, percent=True, vmin=0, vmax=100, valfmt="{x:.2f}", ax=None,
             cbar_kw={}, cbarlabel="", fontsize=config.fontsize, **kwargs):
     """
+    From https://matplotlib.org/3.1.1/gallery/images_contours_and_fields/image_annotated_heatmap.html
+
     Create a heatmap from a numpy array and two lists of labels.
 
     Parameters
@@ -293,6 +308,8 @@ def _annotate_heatmap(im, data=None, valfmt="{x:.2f}",
                      textcolors=["black", "white"],
                      threshold=None, **textkw):
     """
+    From https://matplotlib.org/3.1.1/gallery/images_contours_and_fields/image_annotated_heatmap.html
+
     A function to annotate a heatmap.
 
     Parameters
@@ -349,7 +366,7 @@ def _annotate_heatmap(im, data=None, valfmt="{x:.2f}",
 
 def taylor_diagram(predictions, reference, labels, figsize=(16,9), marker='.', linewidth=2., fontsize=20, ncol=1):
     """
-    Plots a taylor diagram given a collection of time series and a reference.
+    Plots a taylor diagram given a collection of time series and a reference time series.
     """
 
     from .ntaylor import ntaylor
