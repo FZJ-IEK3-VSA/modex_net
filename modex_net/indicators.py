@@ -52,7 +52,8 @@ def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None, d
         if data_source == "csv":
             index = config.carriers_all
         elif data_source == "oep":
-            index = pd.DataFrame.from_records(cli.select_from_table("modexnet_dimension_carrier"))['carrier'].tolist()
+            index = config.carriers_all
+            #index = pd.DataFrame.from_records(cli.select_from_table("modexnet_dimension_carrier"))['carrier'].tolist()
     else:
         raise ValueError("index_name can only be either snapshots or carrier")
     if columns is None:
@@ -62,7 +63,8 @@ def _zeros_df_t(year, index_name, level="market", columns=None, quantity=None, d
             if data_source == "csv":
                 columns = config.eu_neighs_ISO2['eu_neighs_ISO2']
             elif data_source == "oep":
-                columns = pd.DataFrame.from_records(cli.select_from_table("modexnet_dimension_country"))['country_code'].tolist()
+                columns = config.eu_neighs_ISO2['eu_neighs_ISO2']
+                #columns = pd.DataFrame.from_records(cli.select_from_table("modexnet_dimension_country"))['country_code'].tolist()
             if level == "grid" and quantity != "energy_mix":
                 if data_source == "csv":
                     columns = config.de_nuts1['de_nuts1_full_name']
