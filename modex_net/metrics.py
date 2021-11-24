@@ -19,9 +19,12 @@ def _points(x):
 
 def wasserstein(a, b):
     x = _range(a, b)
-    pdf_a = gaussian_kde(a)
-    pdf_b = gaussian_kde(b)
-    return wasserstein_distance(pdf_a(x), pdf_b(x))
+    try:
+        pdf_a = gaussian_kde(a)
+        pdf_b = gaussian_kde(b)
+        return wasserstein_distance(pdf_a(x), pdf_b(x))
+    except:
+        return -0.01
 
 def wasserstein_norm(a, b):
     return wasserstein(a - a.mean(), b - b.mean())
@@ -34,11 +37,14 @@ def bhattacharyya(a, b):
         raise ValueError("a and b must be of the same size")
     x = _range(a, b)
 
-    pdf_a = gaussian_kde(a)
-    pdf_b = gaussian_kde(b)
-    if sum(pdf_a(x)) and sum(pdf_b(x)):
-        return -np.log(sum((np.sqrt(u * w) for u, w in zip(pdf_a(x)/sum(pdf_a(x)), pdf_b(x)/sum(pdf_b(x))))))
-    else:
+    try:
+        pdf_a = gaussian_kde(a)
+        pdf_b = gaussian_kde(b)
+        if sum(pdf_a(x)) and sum(pdf_b(x)):
+            return -np.log(sum((np.sqrt(u * w) for u, w in zip(pdf_a(x)/sum(pdf_a(x)), pdf_b(x)/sum(pdf_b(x))))))
+        else:
+            return -0.01
+    except:
         return -0.01
 
 def bhattacharyya_norm(a, b):
